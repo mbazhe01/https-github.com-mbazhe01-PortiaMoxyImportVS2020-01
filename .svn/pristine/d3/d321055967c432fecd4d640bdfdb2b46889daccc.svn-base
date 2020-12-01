@@ -1,0 +1,44 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace PortiaMoxyImport
+{
+    class MetaData
+    {
+
+        public string outFolder { get; set; }
+        public string srcFile { get; set; }
+        public string tradingCurrencyStoredProc { get; set; }
+        public string portiaConStr { get; set; }
+        public string lastCrossRateProc { get; set; }
+        public string reportingCurrencyStoredProc { get; set; }
+        public string axysPath { get; set; }
+        public string moxyConStr { get; set; }
+
+        public string fxconSrcFile { get; set; }
+
+        public string aimFile { get; set; }
+
+        public MetaData(string outfolder, string srcfile, string tradingcurrencystoredproc, 
+                                     string portiaconstr, string lastcrossratestoredproc, string reportingcurrencystoredproc,
+                                     string axysPath, string moxyconstr, string fxconsrcfile, string aimfile)
+
+        {
+            this.outFolder = outfolder;
+            this.srcFile = srcfile;
+            this.tradingCurrencyStoredProc = tradingcurrencystoredproc;
+            this.portiaConStr = portiaconstr;
+            this.lastCrossRateProc = lastcrossratestoredproc;
+            this.reportingCurrencyStoredProc = reportingcurrencystoredproc;
+            this.axysPath = axysPath;
+            this.moxyConStr = moxyconstr;
+            this.fxconSrcFile = fxconsrcfile;
+            this.aimFile = aimfile;
+        }
+
+
+    }
+}

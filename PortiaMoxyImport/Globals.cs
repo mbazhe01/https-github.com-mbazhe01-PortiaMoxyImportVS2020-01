@@ -1,0 +1,137 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Configuration;
+using System.IO;
+using System.Windows.Forms; 
+
+namespace PortiaMoxyImport
+{
+    public static class Globals
+    {
+        public const int RNDNUM = 12;     // global rounding precision
+        public static int errCnt = 0; // used by classes as error counter
+        public static List <String> errList = new List<String>(); // used to hold error messages
+
+        public static void init()
+        {
+            errCnt = 0;
+            errList.Clear();
+        }
+
+        public static string  saveErr(String errMsg)
+        {
+            try
+            {
+                errCnt += 1;
+                errList.Add(errMsg);
+                return errMsg;
+            }
+            catch(Exception e)
+            {
+                return "Globals.SaveErr: " + e.Message;
+            }
+
+
+           
+        }
+
+        //////
+        public static bool WriteErrorLog(string LogMessage)
+        {
+            bool Status = false;
+            string LogDirectory=null;
+            try
+            {
+                LogDirectory = ConfigurationManager.AppSettings["LogDirectory"].ToString() + "";
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("LogDirectory is unavailable." + e.Message ,
+                                    "Important Note",
+                                    MessageBoxButtons.OK,
+                                            MessageBoxIcon.Exclamation,
+                                            MessageBoxDefaultButton.Button1);
+            }
+            
+
+            DateTime CurrentDateTime = DateTime.Now;
+            string CurrentDateTimeString = CurrentDateTime.ToString();
+            CheckCreateLogDirectory(LogDirectory);
+            string logLine = BuildLogLine(CurrentDateTime, LogMessage);
+            LogDirectory = (LogDirectory + "PortiaMoxyImportLog_" + LogFileName(DateTime.Now) + ".txt");
+
+            lock (typeof(Globals))
+            {
+                StreamWriter oStreamWriter = null;
+                try
+                {
+                    oStreamWriter = new StreamWriter(LogDirectory, true);
+                    oStreamWriter.WriteLine(logLine);
+                    Status = true;
+                }
+                catch
+                {
+
+                }
+                finally
+                {
+                    if (oStreamWriter != null)
+                    {
+                        oStreamWriter.Close();
+                    }
+                }
+            }
+            return Status;
+        }
+
+
+        private static bool CheckCreateLogDirectory(string LogPath)
+        {
+            bool loggingDirectoryExists = false;
+            DirectoryInfo oDirectoryInfo = new DirectoryInfo(LogPath);
+            if (oDirectoryInfo.Exists)
+            {
+                loggingDirectoryExists = true;
+            }
+            else
+            {
+                try
+                {
+                    Directory.CreateDirectory(LogPath);
+                    loggingDirectoryExists = true;
+                }
+                catch
+                {
+                    // Logging failure
+                }
+            }
+            return loggingDirectoryExists;
+        }
+
+
+        private static string BuildLogLine(DateTime CurrentDateTime, string LogMessage)
+        {
+            StringBuilder loglineStringBuilder = new StringBuilder();
+            loglineStringBuilder.Append(LogFileEntryDateTime(CurrentDateTime));
+            loglineStringBuilder.Append(" \t");
+            loglineStringBuilder.Append(LogMessage);
+            return loglineStringBuilder.ToString();
+        }
+
+
+        public static string LogFileEntryDateTime(DateTime CurrentDateTime)
+        {
+            return CurrentDateTime.ToString("dd-MM-yyyy HH:mm:ss");
+        }
+
+
+        private static string LogFileName(DateTime CurrentDateTime)
+        {
+            return CurrentDateTime.ToString("dd_MM_yyyy");
+        }
+
+
+    } // end of class
+}

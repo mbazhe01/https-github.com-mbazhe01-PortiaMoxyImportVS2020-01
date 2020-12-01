@@ -1,0 +1,194 @@
+﻿namespace PortiaMoxyImport
+{
+    partial class Form1
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.tbScreen = new System.Windows.Forms.TextBox();
+            this.button1 = new System.Windows.Forms.Button();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.button2 = new System.Windows.Forms.Button();
+            this.btnPortiaFiles = new System.Windows.Forms.Button();
+            this.buttonMoxyToAIM = new System.Windows.Forms.Button();
+            this.btnPortiaFilesFromImex = new System.Windows.Forms.Button();
+            this.btn_FXConnectTrades = new System.Windows.Forms.Button();
+            this.button4 = new System.Windows.Forms.Button();
+            this.btn_Evare = new System.Windows.Forms.Button();
+            this.SuspendLayout();
+            // 
+            // tbScreen
+            // 
+            this.tbScreen.Location = new System.Drawing.Point(32, 32);
+            this.tbScreen.Margin = new System.Windows.Forms.Padding(4);
+            this.tbScreen.Multiline = true;
+            this.tbScreen.Name = "tbScreen";
+            this.tbScreen.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            this.tbScreen.Size = new System.Drawing.Size(691, 322);
+            this.tbScreen.TabIndex = 0;
+            this.tbScreen.TextChanged += new System.EventHandler(this.tbScreen_TextChanged);
+            // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(239, 453);
+            this.button1.Margin = new System.Windows.Forms.Padding(4);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(81, 28);
+            this.button1.TabIndex = 1;
+            this.button1.Text = "Test Unit 1";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Visible = false;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Location = new System.Drawing.Point(28, 430);
+            this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(49, 17);
+            this.lblStatus.TabIndex = 2;
+            this.lblStatus.Text = "Ready";
+            // 
+            // button2
+            // 
+            this.button2.Location = new System.Drawing.Point(31, 380);
+            this.button2.Margin = new System.Windows.Forms.Padding(4);
+            this.button2.Name = "button2";
+            this.button2.Size = new System.Drawing.Size(199, 28);
+            this.button2.TabIndex = 3;
+            this.button2.Text = "Portia Holdings For Moxy";
+            this.button2.UseVisualStyleBackColor = true;
+            this.button2.Click += new System.EventHandler(this.button2_Click);
+            // 
+            // btnPortiaFiles
+            // 
+            this.btnPortiaFiles.Location = new System.Drawing.Point(559, 453);
+            this.btnPortiaFiles.Margin = new System.Windows.Forms.Padding(4);
+            this.btnPortiaFiles.Name = "btnPortiaFiles";
+            this.btnPortiaFiles.Size = new System.Drawing.Size(79, 28);
+            this.btnPortiaFiles.TabIndex = 4;
+            this.btnPortiaFiles.Text = "Portia Files";
+            this.btnPortiaFiles.UseVisualStyleBackColor = true;
+            this.btnPortiaFiles.Visible = false;
+            this.btnPortiaFiles.Click += new System.EventHandler(this.btnPortiaFiles_Click);
+            // 
+            // buttonMoxyToAIM
+            // 
+            this.buttonMoxyToAIM.Location = new System.Drawing.Point(248, 380);
+            this.buttonMoxyToAIM.Margin = new System.Windows.Forms.Padding(4);
+            this.buttonMoxyToAIM.Name = "buttonMoxyToAIM";
+            this.buttonMoxyToAIM.Size = new System.Drawing.Size(260, 28);
+            this.buttonMoxyToAIM.TabIndex = 5;
+            this.buttonMoxyToAIM.Text = "MOXY -> AIM Trades";
+            this.buttonMoxyToAIM.UseVisualStyleBackColor = true;
+            this.buttonMoxyToAIM.Click += new System.EventHandler(this.buttonMoxyToAIM_Click);
+            // 
+            // btnPortiaFilesFromImex
+            // 
+            this.btnPortiaFilesFromImex.Location = new System.Drawing.Point(239, 417);
+            this.btnPortiaFilesFromImex.Margin = new System.Windows.Forms.Padding(4);
+            this.btnPortiaFilesFromImex.Name = "btnPortiaFilesFromImex";
+            this.btnPortiaFilesFromImex.Size = new System.Drawing.Size(187, 28);
+            this.btnPortiaFilesFromImex.TabIndex = 6;
+            this.btnPortiaFilesFromImex.Text = "Moxy Trades For AIM Old";
+            this.btnPortiaFilesFromImex.UseVisualStyleBackColor = true;
+            this.btnPortiaFilesFromImex.Visible = false;
+            this.btnPortiaFilesFromImex.Click += new System.EventHandler(this.btnPortiaFilesFromImex_Click);
+            // 
+            // btn_FXConnectTrades
+            // 
+            this.btn_FXConnectTrades.Location = new System.Drawing.Point(523, 380);
+            this.btn_FXConnectTrades.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_FXConnectTrades.Name = "btn_FXConnectTrades";
+            this.btn_FXConnectTrades.Size = new System.Drawing.Size(180, 28);
+            this.btn_FXConnectTrades.TabIndex = 7;
+            this.btn_FXConnectTrades.Text = "FX Trades -> AIM";
+            this.btn_FXConnectTrades.UseVisualStyleBackColor = true;
+            this.btn_FXConnectTrades.Click += new System.EventHandler(this.btn_FXConnectTrades_Click);
+            // 
+            // button4
+            // 
+            this.button4.Location = new System.Drawing.Point(328, 453);
+            this.button4.Margin = new System.Windows.Forms.Padding(4);
+            this.button4.Name = "button4";
+            this.button4.Size = new System.Drawing.Size(223, 28);
+            this.button4.TabIndex = 8;
+            this.button4.Text = "Moxy Trades For AIM";
+            this.button4.UseVisualStyleBackColor = true;
+            this.button4.Visible = false;
+            this.button4.Click += new System.EventHandler(this.button4_Click);
+            // 
+            // btn_Evare
+            // 
+            this.btn_Evare.Location = new System.Drawing.Point(523, 418);
+            this.btn_Evare.Name = "btn_Evare";
+            this.btn_Evare.Size = new System.Drawing.Size(180, 28);
+            this.btn_Evare.TabIndex = 9;
+            this.btn_Evare.Text = "Evare --> AIM";
+            this.btn_Evare.UseVisualStyleBackColor = true;
+            this.btn_Evare.Visible = false;
+            this.btn_Evare.Click += new System.EventHandler(this.btn_Evare_Click);
+            // 
+            // Form1
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(759, 501);
+            this.Controls.Add(this.btn_Evare);
+            this.Controls.Add(this.button4);
+            this.Controls.Add(this.btn_FXConnectTrades);
+            this.Controls.Add(this.btnPortiaFilesFromImex);
+            this.Controls.Add(this.buttonMoxyToAIM);
+            this.Controls.Add(this.btnPortiaFiles);
+            this.Controls.Add(this.button2);
+            this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.button1);
+            this.Controls.Add(this.tbScreen);
+            this.Margin = new System.Windows.Forms.Padding(4);
+            this.Name = "Form1";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "Portia Moxy Import 2.1";
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.TextBox tbScreen;
+        private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button btnPortiaFiles;
+        private System.Windows.Forms.Button buttonMoxyToAIM;
+        private System.Windows.Forms.Button btnPortiaFilesFromImex;
+        private System.Windows.Forms.Button btn_FXConnectTrades;
+        private System.Windows.Forms.Button button4;
+        private System.Windows.Forms.Button btn_Evare;
+    }
+}
+

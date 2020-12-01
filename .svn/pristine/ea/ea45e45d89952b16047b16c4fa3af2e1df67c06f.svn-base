@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <appSettings>
+    <add key="LogDirectory" value="J:\\Temp\\AIM\\DATA\\"/>
+    <add key="moxyconstr" value ="Data Source=MOXY;Initial Catalog=moxy;Integrated Security=SSPI"/>
+    <add key ="metadataSP" value="usp_GetPMIMetaData"/>
+    <add key ="getPortiaSrcFilesSP" value="usp_GetPortiaSrcFiles"/>
+    <add key ="getMoxyImportFilesSP" value="usp_GetMoxyImportFiles"/>
+    <add key ="BrokerImportRequiredCols" value="36"/>
+  
+  </appSettings>
+<startup><supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.6"/></startup></configuration>

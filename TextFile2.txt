@@ -1,0 +1,97 @@
+ private int unfoldSpecificLots(string file) {
+            int rtn = 0;
+
+            try
+            {
+                string[] lines = File.ReadAllLines(file);
+                List<string> newLines = new List<string>();
+
+                if (lines != null && lines.Length != 0)
+                {
+                    // process Moxy trades file line by line
+                    for (int i=0; i<lines.Length  ; i++)
+                    {
+                        string[] items = lines[i].Split(',');
+
+                        // this is a comment line - ignore
+                        if (lines[i].IndexOf(";,;,") != -1 ) { continue; }
+
+                        // clear tax lot # destination
+                        items[31] = string.Empty;
+
+                        // equity sell
+                        if (!items[4].Equals("$cash") && (items[1].Equals("sl") || items[1].Equals("SL")))
+                        {
+
+                            string sellingRule = getSellingRule(items[9], items[0]);
+                            //
+                            // specific lots sold -> replace this trade with specific lots trades
+                            // the lines after this will have 
+                            //
+                            if (sellingRule.Equals("0"))
+                            {
+                                // preserve orig sell
+                                string[] origSell=(string[]) items.Clone() ;
+                                
+                                Array.Copy(items, origSell, 0 ); 
+
+                                i++;
+                                //&& (i + 1) < lines.Length
+                                while (i < lines.Length && lines[i].IndexOf("LOT:QTY") != -1 )
+                                {
+
+                                    string[] lot = lines[i].Split(',');
+                                    string lotNum = string.Empty;
+                                    string qty = string.Empty;
+                                    if (extractLotQty(lot[2], ref lotNum, ref qty) != -1)
+                                    {
+                                        //
+                                        // create specific lot trade here
+                                        // lot number goes to dest. lot location [31] 
+                                        //
+                                        string[] lotTrade = null;
+                                        if (createLotSell(origSell, qty, lotNum, ref lotTrade) != -1)
+                                        {
+                                            newLines.Add(String.Join(",", lotTrade));
+                                        }
+                                        else
+                                        {
+                                            // failed to create lot sell
+                                            tbScreen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " :  Failed to create a lot sell."));
+                                        }// end of else
+
+                                    }// end of if
+                                    i++;
+                                } // end of while
+                                i--;
+                            }
+                            else
+                            {
+                                newLines.Add(lines[i]);
+                            }
+
+                        }
+                        else
+                        {
+                            newLines.Add(lines[i]);
+                        }
+
+
+                    }// end of for
+                    File.WriteAllLines(file, newLines);
+                } // end of if
+                else
+                {
+                    // empty file
+                    tbScreen.AppendText(file + " is empty."); 
+                    rtn = -1;
+                }
+            } // end of try
+            catch (Exception ex)
+            {
+                tbScreen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " : " + ex.Message));
+                Globals.WriteErrorLog(ex.ToString());
+            }
+        
+            return rtn;
+        } // end of unfoldSpecificLots()

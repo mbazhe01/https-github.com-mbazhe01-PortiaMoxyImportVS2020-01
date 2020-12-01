@@ -1,0 +1,6 @@
+PortiaMoxyImport Application
+
+10/06/2020
+1. Remove AutoSpot generated trade when converting trades from Moxy to AIM
+10/15/2020
+2. Limit USD/KRW fx rate to 12 decimals.
