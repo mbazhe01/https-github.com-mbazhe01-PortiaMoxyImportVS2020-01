@@ -469,7 +469,114 @@ namespace PortiaMoxyImport
             return rtn;
         } // end of convertGroups function
 
-        public int convertPrice(String aInFile, String aOutFile)
+               
+        public int convertSecType(String aInFile, String aOutFile)
+        {
+            int rtn = 0;
+            string tmp = string.Empty;
+            string line = string.Empty;
+            var myList = new List<string>();
+            string[] arr;
+            int requiredCols = 76;
+            string errLine = string.Empty;
+
+            try {
+                screen.AppendText("######################" + Environment.NewLine);
+                screen.AppendText("###   Sec Type Conversion   ###\r\n");
+                screen.AppendText("######################" + Environment.NewLine);
+
+                StreamWriter sw = new StreamWriter(aOutFile);
+                List<String> secTypeList = new List<String>();
+
+                List<string> columns = new List<string>();
+                using (var reader = new CsvFileReader(aInFile))
+                {
+                    
+                    while (reader.ReadRow(columns))
+                    {
+                        Application.DoEvents();
+                                               
+                        arr = columns.ToArray();
+                        if (arr[arr.Length - 1].Trim() != "SECTYPE")
+                        {
+                            // validate that the line has been split into columns = requiredColumns
+                            if (arr.Length != requiredCols)
+                            {
+                                foreach (string col in columns)
+                                {
+                                    errLine += col + " ";
+                                }
+                                screen.AppendText("convertSecType ERROR: " + String.Format("Line {0} could not be split into {1} fields required for Moxy import\r\n", errLine, requiredCols.ToString()));
+                                rtn = -1;
+                                return rtn;
+                            }
+
+                            line = String.Empty;
+
+                            // remove double quotes
+                            for (int i = 0; i <= (arr.Length - 1); i++)
+                            {
+                                arr[i] = arr[i].Replace("\"", String.Empty);
+                            }
+
+                            // combine sec type in one column
+                            arr[0] = arr[0].ToLower() + arr[1].ToLower();
+                            arr[1] = String.Empty;
+                            arr[arr.Length - 1] = "?"; //  last field
+
+                            line = String.Empty;
+                            for(int i=0; i<arr.Length;i++)
+                            {
+                                if(i!=arr.Length-1)
+                                    line += arr[i] + "\t";
+                                else
+                                    line += arr[i] ;
+                            }
+                              
+
+                           // shoud remove the last TAB character ???
+
+                        }
+                        else
+                        {
+                            line = arr[0];
+                        }
+                                               
+                        //sw.WriteLine(line);
+                        secTypeList.Add(line);
+                        rtn += 1;
+                        status.Text = String.Format("Sec Type # {0}", rtn.ToString());
+
+                    }  // end of while
+
+                } // end of using
+
+                // remove douplicates
+                secTypeList = secTypeList.Distinct().ToList();
+
+                rtn = secTypeList.Count;
+                // write sec types to output file
+                foreach(String s in secTypeList)
+                    sw.WriteLine(s);
+
+                sw.Close();
+                if (rtn != -1)
+                {
+                    screen.AppendText(String.Format("{0} sec types loaded into file {1}\r\n", (rtn - 1).ToString(), aOutFile));
+                    screen.AppendText(Environment.NewLine);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                screen.AppendText("convertSecType: " + ex.Message + Environment.NewLine);
+                rtn = -1;
+            }
+
+            return rtn;
+        }
+
+            public int convertPrice(String aInFile, String aOutFile)
         {
             int rtn = 0;
             string tmp = string.Empty;
@@ -933,7 +1040,7 @@ namespace PortiaMoxyImport
             int max = 0;
             int runningMax = 0;
             int exch = 0;
-            int requiredCols = 20;
+            int requiredCols = 22;
             try
             {
                 printHeader("Convert Security");
@@ -966,7 +1073,7 @@ namespace PortiaMoxyImport
                         if (arr[arr.Length - 1].Trim() != "SECURITY")
                         {
                             
-                            // validate that the line has been split into 17 columns
+                            // validate that the line has been split into number of required  columns
                             if (arr.Length != requiredCols)
                             {
                                 screen.AppendText( "convertSecurity ERROR: " + String.Format("Line {0} could not be split into {1} fields required for Moxy import\r\n", line, requiredCols.ToString()));
@@ -987,11 +1094,7 @@ namespace PortiaMoxyImport
                                 line = String.Format("<SCX type=\"{0}\" ", arr[0].Trim());
                                 line += String.Format("iso=\"{0}\" ", arr[2].Trim());
                                 line += String.Format("symbol=\"{0}\" ", arr[3].Trim());
-
-                                if (arr[3].Trim().Equals("cnhi.mi")  )
-                                {
-                                    rtn = 0;
-                                }
+                                                               
 
                                 // replace & with &amp; so Moxy exepts it.
                                 String fullName = arr[4].Trim().Replace("&", "&amp;") ;
@@ -1074,14 +1177,25 @@ namespace PortiaMoxyImport
                                 if (arr[19] != string.Empty)
                                 {
                                     if (Double.Parse(arr[19]) > 0)
-                                        line += String.Format("shareout=\"{0}\"/> ", arr[19]);
+                                        line += String.Format("shareout=\"{0}\" ", arr[19]);
                                     else
-                                        line += String.Format("shareout=\"{0}\"/> ", "0.001");
+                                        line += String.Format("shareout=\"{0}\" ", "0.001");
                                 }
-                                else
+
+                                if (arr[20] != string.Empty)
                                 {
-                                    line += "/> ";
+                                    line += String.Format("fixenabled=\"{0}\" ", arr[20]);
                                 }
+
+                                if (arr[21] != string.Empty)
+                                {
+                                    line += String.Format("userdef1=\"{0}\" ", arr[21]);
+                                }
+
+                                //else
+                                //{
+                                    line += "/> ";
+                                //}
 
                                 //line =String.Format ( @"<SCX type="{0}" iso="{1}" symbol="{2}" fullname="{3}" cusip="{4}" country="{5}" exch="{6}" axyssecuserdef1id="{7}" axyssecuserdef2id="{8}" axyssecuserdef3id="{9}" astcode="{10}" shortassetclass="{11}" isin="{12}" sedol="{13}" issuer="{14}"/>\n", arr[0] ); 
                             } // end FOR loop

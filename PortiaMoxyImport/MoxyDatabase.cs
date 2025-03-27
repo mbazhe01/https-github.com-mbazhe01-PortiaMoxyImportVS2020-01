@@ -6,6 +6,7 @@ using System.Data.SqlClient;
 using System.Data;
 using System.Windows.Forms;
 using System.Diagnostics;
+using PortiaMoxyImport.Entities;
 
 namespace PortiaMoxyImport
 {
@@ -95,6 +96,77 @@ namespace PortiaMoxyImport
             return rtn;
 
         }
+
+        public List<TrnLine>  getMoxyExport(DateTime asOfDate)
+        {
+            List<TrnLine> trades =  new List<TrnLine>();
+            try
+            {
+                // get stored procedure name
+                String storedProc = Util.getAppConfigVal("moxyExportSP");
+                // get how many days back check trade date
+                Int16 backDays = Int16.Parse(Util.getAppConfigVal("tradeDaysBack"));
+
+                // get trades ready for export from moxy
+                DataTable table = new DataTable();
+
+                var con = new SqlConnection(dbConnection);
+                con.Open();
+                var cmd = new SqlCommand();
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.CommandText = storedProc;
+                cmd.Connection = con;
+
+                // Add parameters and set values.  
+                SqlParameter selectedDate = cmd.Parameters.Add(new SqlParameter( "@asofdate", SqlDbType.DateTime));
+                selectedDate.Direction = ParameterDirection.Input;
+                selectedDate.Value = asOfDate;
+
+                SqlParameter daysBack = cmd.Parameters.Add(new SqlParameter("@check_back_days", SqlDbType.Int));
+                daysBack.Direction = ParameterDirection.Input;
+                daysBack.Value = backDays;
+
+                //var da = new SqlDataAdapter(cmd.CommandText, con);
+                //da.Fill(table);
+               
+                using (SqlDataReader rdr = cmd.ExecuteReader())
+                {
+
+                    if (rdr.HasRows)
+                    {
+                        // iterate through results, printing each to console
+                        while (rdr.Read())
+                        {
+                            trades.Add(new TrnLine(
+                                                        rdr[1].ToString().Trim(),//port code
+                                                        rdr[4].ToString().Trim(),// tran code
+                                                        rdr[2].ToString().Trim(),// sec type
+                                                        rdr[3].ToString().Trim(), //symbol
+                                                        (DateTime)rdr[5], // trade date
+                                                         (DateTime)rdr[6], // settle date   
+                                                         (Double)rdr[7], // quantity
+                                                         rdr[8].ToString().Trim(), // close meth
+                                                          (Double)rdr[9], // td fx rate
+                                                           (Double) rdr[10], // sd fx rate
+                                                            (Double)rdr[11] // trade amt
+                                                        )                                       
+                                );    
+                            screen.AppendText(String.Format("\r\nFound Trade: {0} for sec type: {1}.", rdr[8].ToString().Trim(), rdr[1].ToString().Trim()));
+                        }
+                    }
+                }// eo using
+
+                }
+            catch (Exception e)
+            {
+              
+                screen.AppendText(Globals.saveErr(GetCurrentMethod() + ":" + e.Message + "\r\n"));
+                Globals.WriteErrorLog(e.ToString());
+                throw e;
+            }
+
+            return trades;
+        }//eof
 
         public int getISOCurrency(string aSecType, ref string aISOCode)
         {
@@ -274,7 +346,7 @@ namespace PortiaMoxyImport
             return rtn;  
         }
 
-        protected int getConversionInstructions(string aCurrency1, string aCurrency2, ref string aConversionInstruction)
+        protected int getConversionInstructions(string aCurrency1, string aCurrency2, int aInstructionType, ref string aConversionInstruction)
         {
             int rtn = 0;
            
@@ -286,7 +358,7 @@ namespace PortiaMoxyImport
                     conn.Open();
 
                     // 1.  create a command object identifying the stored procedure
-                    SqlCommand cmd = new SqlCommand("usp_GetConversionInstruction", conn);
+                    SqlCommand cmd = new SqlCommand("usp_GetConversionInstruction02", conn);
 
                     // 2. set the command object so it knows to execute a stored procedure
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -294,6 +366,7 @@ namespace PortiaMoxyImport
                     // 3. add parameter to command, which will be passed to the stored procedure
                     cmd.Parameters.Add(new SqlParameter("@cur1", aCurrency1));
                     cmd.Parameters.Add(new SqlParameter("@cur2", aCurrency2));
+                    cmd.Parameters.Add(new SqlParameter("@instructiontype", aInstructionType));
                     // execute the command
                     using (SqlDataReader rdr = cmd.ExecuteReader())
                     {
@@ -396,7 +469,7 @@ namespace PortiaMoxyImport
                        
                         // get security ISO Code
                         //if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secISOCode, aTradingCur, ref conversionInstruction) != -1)
-                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(securityCur, aTradingCur, ref aConversionInstruction) != -1)
+                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(securityCur, aTradingCur,0, ref aConversionInstruction) != -1)
                         {
                             //screen.AppendText(String.Format("\r\nFound cross rate: {0} for trade match id: {1}.", aCrossRate, aTradeMatchId));
 
@@ -471,7 +544,7 @@ namespace PortiaMoxyImport
 
                         // get security ISO Code
                         //if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secISOCode, aTradingCur, ref conversionInstruction) != -1)
-                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secType, tradingCur, ref aConversionInstruction) != -1)
+                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secType, tradingCur,0, ref aConversionInstruction) != -1)
                         {
                             //screen.AppendText(String.Format("\r\nFound cross rate: {0} for trade match id: {1}.", aCrossRate, aTradeMatchId));
 
@@ -488,7 +561,7 @@ namespace PortiaMoxyImport
                 Globals.WriteErrorLog(e.Message);
             }
 
-            return rtn;
+             return rtn;
         } // end of getCrossRate()
 
         public int getCrossRateCash(int aTradeMatchId, string aTradeDate, string aSecType, string aTradingCur, string aPortfolio, ref string aCrossRate, ref string aConversionInstruction)
@@ -545,7 +618,7 @@ namespace PortiaMoxyImport
 
                         // get security ISO Code
                         //if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secISOCode, aTradingCur, ref conversionInstruction) != -1)
-                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secType, tradingCur, ref aConversionInstruction) != -1)
+                        if (getISOCurrency(aSecType, ref secISOCode) != -1 && getConversionInstructions(secType, tradingCur,1, ref aConversionInstruction) != -1)
                         {
                             //screen.AppendText(String.Format("\r\nFound cross rate: {0} for trade match id: {1}.", aCrossRate, aTradeMatchId));
 

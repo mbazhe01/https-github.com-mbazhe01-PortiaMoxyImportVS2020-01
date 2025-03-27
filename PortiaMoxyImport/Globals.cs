@@ -11,6 +11,7 @@ namespace PortiaMoxyImport
     public static class Globals
     {
         public const int RNDNUM = 12;     // global rounding precision
+        public const int RNDNUM2 = 2;     // global rounding precision
         public static int errCnt = 0; // used by classes as error counter
         public static List <String> errList = new List<String>(); // used to hold error messages
 

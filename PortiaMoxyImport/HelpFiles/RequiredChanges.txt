@@ -7,3 +7,60 @@ PortiaMoxyImport Application
 11/30/2020
 3. Added function getCrossRateCash to MoxyDatabase class.
     This function gets fx rates for cash offsets.
+12/04/2020
+4.  Settle currency for non us securities should be portfolio trading currency,
+     settle currency for us securities should be USD. Affects all equity functions under Trade
+     class.
+
+05/18/2021
+5. Add columns fixenabled and userdef1 to security xml file 
+
+06/09/2021
+6. equityUsDiffCurBuy - when trade currency and portfolio currecy are not the same
+    sec to port is blank
+
+06/11/2021
+7. on sell by lot when unfolding the lots add rounding differences for trade amount,
+    sec fee, commission, and other fee to the last lot.
+
+08/12/2021
+8. changed function cashNonUsDiffCurBuy to take cross rate from moxy - not to
+    calculate it
+
+08/17/2021
+9. Create a copy of Moxy -> AIM files in another folder
+
+08/20/2021
+10. changed function cashNonUsDiffCurSell02() to take cross rate from Moxy
+      for sec to cash balance. It's 1/crossrate for eu, gb, au, nz, and
+      just crossrate for the rest.
+
+10/27/2021
+11. add processing of  sectype file
+
+7/14/2022
+12. FIX provides cross rates for equities, FX Connect - for cash.
+      For some currencies the rates might go in opposite directions.
+      Split conversion instructions for equities and cash.
+
+      1. create a new table tb_CurConversionAIM with extra colum: int InstructionType.
+           where 0 value represents equties, and 1 is cash.
+      2. create new stored procedures usp_GetConversionInstructions02
+          to reflect new table.
+      3. In the app change the references to new stored procedures.
+      4. Change MoxyDatabase getConversionInstruction function
+
+    --------------------------
+    For future development: create a class reflecting items[59] fields
+    --------------------------
+    
+    08/25/2022
+
+    1. Create TrnLine class to represent a trade from .trn file.
+    2. Create AIMController class.
+
+    08/07/2023
+
+    1. create function unsupervisedCheck which returns unsupervised message with currency
+
+

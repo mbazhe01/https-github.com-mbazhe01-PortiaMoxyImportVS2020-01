@@ -11,6 +11,8 @@ using System.IO;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Collections;
+using PortiaMoxyImport.Forms;
+using PortiaMoxyImport.Entities;
 
 namespace PortiaMoxyImport
 {
@@ -235,6 +237,12 @@ namespace PortiaMoxyImport
                                 break;
                             case "industry":
                                 if (pm.convertIndustry(inPath, outPath) == -1)
+                                {
+                                    return;
+                                }
+                                break;
+                            case "sectype":
+                                if (pm.convertSecType(inPath, outPath) == -1)
                                 {
                                     return;
                                 }
@@ -1127,7 +1135,8 @@ namespace PortiaMoxyImport
         {          
                     
             try
-            {
+            { 
+                // SQLLITE
                 SQLiteDatabase db;
                 db = new SQLiteDatabase(sqlitedb);
                 DataTable moxyConn;
@@ -1142,8 +1151,7 @@ namespace PortiaMoxyImport
                   
                 }
 
-                if (ReportMetaData("moxy", "outFolder", outFolder, GetCurrentMethod()) == -1) { return -1; }
-                             
+                if (ReportMetaData("moxy", "outFolder", outFolder, GetCurrentMethod()) == -1) { return -1; }          
 
                 // get Axys location
                 query = "select ID \"id\", VALUE \"value\"";
@@ -1530,7 +1538,7 @@ namespace PortiaMoxyImport
 
             ///////////////////////////////////////////////////////////////////////////////////////////////
             //                                                                                                                  //
-            // analyze & format FX Connect trade for AIM                                       //    
+            // analyze & format FX trade for AIM                                       //    
             //                                                                                                                  //
             ///////////////////////////////////////////////////////////////////////////////////////////////
             TradeFX trade = new TradeFX(tbScreen, line, dbConn, dbConnPortia, tradingCurrencyStoredProc, lastCrossRateStoredProc, string.Empty, fctrades, "");
@@ -2456,7 +2464,6 @@ namespace PortiaMoxyImport
                 MetaData mData = getAppMetaDataMoxy();
                 PortiaDatabase pd = new PortiaDatabase(mData.portiaConStr, tbScreen, mData.tradingCurrencyStoredProc, mData.lastCrossRateProc, mData.sellRuleStoredProc);
 
-
                 if (lines != null && lines.Length != 0)
                 {
                     // process Moxy trades file line by line
@@ -2477,19 +2484,7 @@ namespace PortiaMoxyImport
                             //
                             // check if the selling rule has been set by moxy
                             //
-                            string sellingRule = string.Empty;
-
-                            if (String.IsNullOrEmpty (items[9]))
-                            {
-                                // no rule is set --> get the selling rule from portia
-                                sellingRule = pd.getSellingRule(items[0]);
-                            } else
-                            {
-                                sellingRule = getSellingRule(items[9], items[0]);
-                            }
-
-                            
-
+                            string sellingRule = getSellingRule(items, pd);
 
                             //
                             // specific lots sold -> replace this trade with specific lots trades
@@ -2499,7 +2494,10 @@ namespace PortiaMoxyImport
                             {
                                 // preserve orig sell
                                 string[] origSell=(string[]) items.Clone() ;
-                                
+                                Double otherFeeSum = 0;
+                                Double tradeAmtSum = 0;
+                                Double secFeeSum = 0;
+                                Double commissionSum = 0;
                                 Array.Copy(items, origSell, 0 ); 
 
                                 i++;
@@ -2520,6 +2518,10 @@ namespace PortiaMoxyImport
                                         if (createLotSell(origSell, qty, lotNum, ref lotTrade) != -1)
                                         {
                                             newLines.Add(String.Join(",", lotTrade));
+                                            otherFeeSum += Double.Parse(lotTrade[26]);
+                                            tradeAmtSum += Double.Parse(lotTrade[17]);
+                                            secFeeSum += Double.Parse(lotTrade[22]);
+                                            commissionSum += Double.Parse(lotTrade[23]);
                                         }
                                         else
                                         {
@@ -2530,6 +2532,57 @@ namespace PortiaMoxyImport
                                     }// end of if
                                     i++;
                                 } // end of while
+
+                                // add rounding difference to the last lot
+                                Double roundDiffOtherFee =Math.Round( Double.Parse(origSell[26]) - otherFeeSum, Globals.RNDNUM2);
+                                addRoundingDiffToLastLot(26, newLines, roundDiffOtherFee);
+                                
+                                //if(roundDiffOtherFee != 0)
+                                //{
+                                //    string[] lastLot = newLines[newLines.Count - 1].Split(',');
+                                //    // new other fee
+                                //    lastLot[26] = (Double.Parse(lastLot[26]) + roundDiffOtherFee).ToString();
+                                //    // remove last new line and add corrected
+                                //    newLines.RemoveAt(newLines.Count - 1);
+                                //    newLines.Add(String.Join(",", lastLot));
+                                //}
+                                Double roundDiffTradeAmt = Math.Round(Double.Parse(origSell[17]) - tradeAmtSum, Globals.RNDNUM2);
+                                addRoundingDiffToLastLot(17, newLines, roundDiffTradeAmt);
+                                
+                                //if (roundDiffTradeAmt != 0)
+                                //{
+                                //    string[] lastLot = newLines[newLines.Count - 1].Split(',');
+                                //    // new trade amt
+                                //    lastLot[17] = (Double.Parse(lastLot[17]) + roundDiffTradeAmt).ToString();
+                                //    // remove last new line and add corrected
+                                //    newLines.RemoveAt(newLines.Count - 1);
+                                //    newLines.Add(String.Join(",", lastLot));
+                                //}
+                                Double roundDiffSecFee = Math.Round(Double.Parse(origSell[22]) - secFeeSum, Globals.RNDNUM2);
+                                addRoundingDiffToLastLot(22, newLines, roundDiffSecFee);
+
+                                //if (roundDiffSecFee != 0)
+                                //{
+                                //    string[] lastLot = newLines[newLines.Count - 1].Split(',');
+                                //    // new trade amt
+                                //    lastLot[22] = (Double.Parse(lastLot[22]) + roundDiffSecFee).ToString();
+                                //    // remove last new line and add corrected
+                                //    newLines.RemoveAt(newLines.Count - 1);
+                                //    newLines.Add(String.Join(",", lastLot));
+                                //}
+                                Double roundDiffCommission = Math.Round(Double.Parse(origSell[23]) - commissionSum, Globals.RNDNUM2);
+                                addRoundingDiffToLastLot(23, newLines, roundDiffCommission);
+                                
+                                //if (roundDiffCommission != 0)
+                                //{
+                                //    string[] lastLot = newLines[newLines.Count - 1].Split(',');
+                                //    // new trade amt
+                                //    lastLot[23] = (Double.Parse(lastLot[23]) + roundDiffCommission).ToString();
+                                //    // remove last new line and add corrected
+                                //    newLines.RemoveAt(newLines.Count - 1);
+                                //    newLines.Add(String.Join(",", lastLot));
+                                //}
+
                                 i--;
                             }
                             else
@@ -2561,7 +2614,7 @@ namespace PortiaMoxyImport
             }
         
             return rtn;
-        } // end of unfoldSpecificLots()
+        } // end of uySpecificLots()
 
         /// <summary>
         ///     extractLotQty() - extract lot number and lot qty 
@@ -2604,25 +2657,25 @@ namespace PortiaMoxyImport
                 lotSell =(string[])origSel.Clone() ;
                 lotSell[8] = lotQty;          
                 lotSell [31] = lotNum;
-                Double newTradeAmt =Math.Round (( Double.Parse(origSel[17]) / Double.Parse(origSel[8]))*  Double.Parse(lotQty), Globals.RNDNUM) ;
+                Double newTradeAmt =Math.Round (( Double.Parse(origSel[17]) / Double.Parse(origSel[8]))*  Double.Parse(lotQty), Globals.RNDNUM2) ;
                 lotSell[17] = newTradeAmt.ToString();
                 lotSell[31] = lotNum;
 
                 // sec fee
                 if (Double.TryParse(origSel[22] , out number)){
-                    Double newSECFee = Math.Round((Double.Parse(origSel[22]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM);
+                    Double newSECFee = Math.Round((Double.Parse(origSel[22]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM2);
                     lotSell[22] = newSECFee.ToString();  
                 }
                 // commission
                 if (Double.TryParse(origSel[23], out number))
                 {
-                    Double newCommission = Math.Round((Double.Parse(origSel[23]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM);
+                    Double newCommission = Math.Round((Double.Parse(origSel[23]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM2);
                     lotSell[23] = newCommission.ToString();  
                 }
                 // other fee
                 if (Double.TryParse(origSel[26], out number))
                 {
-                    Double newOtherFee = Math.Round((Double.Parse(origSel[26]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM);
+                    Double newOtherFee = Math.Round((Double.Parse(origSel[26]) / Double.Parse(origSel[8])) * Double.Parse(lotQty ), Globals.RNDNUM2);
                     lotSell[26] = newOtherFee.ToString();
                 }
                 
@@ -2664,12 +2717,7 @@ namespace PortiaMoxyImport
                 ef.convertToAIM(f);
             }
 
-            
-
-
         }
-
-     
 
       
         private void button3_Click(object sender, EventArgs e)
@@ -2684,6 +2732,7 @@ namespace PortiaMoxyImport
         // Moxy -> AIM trades
         private void button3_Click_1(object sender, EventArgs e)
         {
+          
             Globals.errCnt = 0;                                                         // reset error counter
             tbScreen.Clear();
             string fileName = null;
@@ -2769,10 +2818,15 @@ namespace PortiaMoxyImport
                 }
 
                 File.WriteAllLines(mData.outFolder + newFile, newLines);
+                // send a copy of the file to Portia 12 conversion folder
+                String fileCopyOutFolder = Util.getAppConfigVal("moxyAIMOutFolder");
+                File.WriteAllLines(fileCopyOutFolder + newFile, newLines);
+
 
                 // delete trn file
                 File.Delete(mData.srcFile);
                 // report errors
+                tbScreen.AppendText(String.Format("\r\n\r\nFile copy: {0}", fileCopyOutFolder + newFile ));
                 tbScreen.AppendText(String.Format("\r\n\r\nNumber of trades: {0}", count));
                 tbScreen.AppendText(String.Format("\r\n\r\nNumber of errors: {0}", Globals.errCnt.ToString()));
                 lblStatus.Text = "Ready";
@@ -2832,7 +2886,7 @@ namespace PortiaMoxyImport
             string fType = string.Empty;     // file tyypes: holiday, groups, price, currency, portfolio, security, taxlot, broker
             string inPath = string.Empty;   // input file path  
             string outPath = string.Empty; // output file path  
-            HashSet<string> hsPortfolios = null; // to hold all portfolios coming from Portia
+            //HashSet<string> hsPortfolios = null; // to hold all portfolios coming from Portia
             try
             {
                 tbScreen.Clear();
@@ -2866,8 +2920,6 @@ namespace PortiaMoxyImport
                 FCTrades fctrades = getFCTrades(tbScreen, mData);
 
                 convertFXToAIM(tbScreen, mData, fctrades);
-
-
 
 
             }
@@ -2926,6 +2978,7 @@ namespace PortiaMoxyImport
                 String file = Path.GetFileNameWithoutExtension(mData.outFolder + mData.aimFile) + Util.DateTimeStamp() 
                             + Path.GetExtension(mData.outFolder + mData.aimFile) ;
                 String fnameAIM = mData.outFolder + file;
+                String fnameAIMCopy = Util.getAppConfigVal("moxyAIMOutFolder") + file;
                 String line = null;
                 String portfolio = null;
                 StreamWriter fwAIM = File.CreateText(fnameAIM);
@@ -2955,7 +3008,12 @@ namespace PortiaMoxyImport
                 while (!(line==null));
                 sr.Close();
                 fwAIM.Close();
+                // make a copy of the file for portia 12
+
+                File.Copy(fnameAIM, fnameAIMCopy);
+
                 screen.AppendText("\r\n\r\n Created file for AIM: " +fnameAIM);
+                screen.AppendText("\r\n\r\n Created copy of file for AIM: " + fnameAIMCopy);
                 screen.AppendText("\r\n Trades in the file : " + cnt);
 
             }
@@ -2965,5 +3023,71 @@ namespace PortiaMoxyImport
             }
         }
 
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            this.Text = "Portia Moxy 18 Import v." + Util.getAppConfigVal("Version") +
+                              " " + Util.getAppConfigVal("moxyconstr").Replace("Integrated Security=SSPI", "");
+        }
+
+        string getSellingRule(string[] items, PortiaDatabase pd)
+        {
+            string sellingRule = string.Empty;
+
+            if (String.IsNullOrEmpty(items[9]))
+            {
+                // no rule is set --> get the selling rule from portia
+                sellingRule = pd.getSellingRule(items[0]);
+            }
+            else
+            {
+                sellingRule = getSellingRule(items[9], items[0]);
+            }
+
+            return sellingRule;
+        }
+
+        void addRoundingDiffToLastLot(int arrayInd, List<string> newLines, Double roundDiff)
+        {
+            if (newLines.Count > 0 &&  roundDiff != 0)
+            {
+                string[] lastLot = newLines[newLines.Count - 1].Split(',');
+                // new trade amt
+                lastLot[arrayInd] = (Double.Parse(lastLot[arrayInd]) + roundDiff).ToString();
+                // remove last new line and add corrected
+                newLines.RemoveAt(newLines.Count - 1);
+                newLines.Add(String.Join(",", lastLot));
+            }
+        }
+
+        private void buttonMoxyAIM_Click(object sender, EventArgs e)
+        {
+            Globals.errCnt = 0;           // reset error counter
+            tbScreen.Clear();
+                   
+            DateTime asOfDate;
+
+            try
+            {
+                MetaData mData = getAppMetaDataMoxy();
+
+                // get date - by default is today
+                FormSelectDate frmSelect = new FormSelectDate();
+
+                if (frmSelect.ShowDialog(this) == DialogResult.OK)
+                {
+                    MoxyDatabase md = new MoxyDatabase(Util.getAppConfigVal("moxyconstr"), tbScreen);
+                    PortiaDatabase pd = new PortiaDatabase(mData.portiaConStr, tbScreen, mData.tradingCurrencyStoredProc, mData.lastCrossRateProc, mData.sellRuleStoredProc);
+                    asOfDate = frmSelect.getSelectedDate();
+
+                    List<TrnLine>  trades = md.getMoxyExport(asOfDate);
+                     tbScreen.AppendText(String.Format("\r\n\r\nNumber of trades: {0}", trades.Count));
+
+                }
+            } catch(Exception ex)
+            {
+                tbScreen.AppendText(Globals.saveErr(GetCurrentMethod() + ":" + ex.Message + "\r\n"));
+            }
+
+        }//eof
     } // end of class
 }  // end of namespace

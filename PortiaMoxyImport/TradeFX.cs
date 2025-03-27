@@ -42,7 +42,7 @@ namespace PortiaMoxyImport
             }
             if (items[11].IndexOf("cacn") != -1)
             {
-                items[11] = items[3].Replace("cacn", "cacc");
+                items[11] = items[11].Replace("cacn", "cacc");
             }
 
             // get broker & trade date from fc trade
@@ -299,7 +299,6 @@ namespace PortiaMoxyImport
             rtn = md.flipRate(cur1, cur2, ref flip);
 
 
-
             if (flip)
             {
                 // sec2port
@@ -357,6 +356,70 @@ namespace PortiaMoxyImport
             return rtn;
         }
 
+        public int fxcashUsSameCurBuy()
+        {
+            int rtn = 0;
+
+            Screen.AppendText(String.Format(" Executing {0} ", GetCurrentMethod()));
+
+            // replace Moxy src & dest symbols with Portia format like -CAD CASH-
+            rtn = md.convertSymbolToPortiaFwdCash(ref items[3], ref items[4]);
+            rtn = md.convertSymbolToPortiaFwdCash(ref items[11], ref items[12]);
+
+            items[5] = tradeDate;
+
+            // set broker from fx trade 
+            items[24] = broker;
+
+            // sec to port
+            items[13] = "1";
+
+            // sec2cashbal
+            // sec2cashbal
+            items[15] = Math.Round(Double.Parse(items[8]) / Double.Parse(items[17]), Globals.RNDNUM).ToString();
+
+            return rtn;
+        }
+
+        public int fxcashUsSameCurSell()
+        {
+            int rtn = 0;
+
+            Screen.AppendText(String.Format(" Executing {0} ", GetCurrentMethod()));
+
+            // replace Moxy src & dest symbols with Portia format like -CAD CASH-
+            rtn = md.convertSymbolToPortiaFwdCash(ref items[3], ref items[4]);
+            rtn = md.convertSymbolToPortiaFwdCash(ref items[11], ref items[12]);
+
+            items[5] = tradeDate;
+
+            // set broker from fx trade 
+            items[24] = broker;
+
+            // replace sell with buy
+            // swap src dest symbols
+
+            items[1] = "by";
+
+            string tmp = items[3];
+            string tmp2 = items[4];
+            items[3] = items[11];
+            items[4] = items[12];
+            items[11] = tmp;
+            items[12] = tmp2;
+
+            tmp = items[8];
+            items[8] = items[17];
+            items[17] = tmp;
+
+            // sec to port
+            items[13] = "1";
+
+            // sec2cashbal
+            items[15] = Math.Round(Double.Parse(items[8]) / Double.Parse(items[17]), Globals.RNDNUM).ToString();
+
+            return rtn;
+        }
 
     } // end of class
 }

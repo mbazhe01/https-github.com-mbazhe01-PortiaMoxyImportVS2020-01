@@ -61,7 +61,12 @@ namespace PortiaMoxyImport
             items = aLine.Split(',');
             Screen.AppendText("\r\n ---\r\n Tran code: " + items[1] + " Line in the file: " + tradeCnt );
 
-          if (tradeCnt==27 )
+          if (tradeCnt==38 )
+            {
+                rtn = 0;
+            }
+
+          if(items[0].Equals("24132"))
             {
                 rtn = 0;
             }
@@ -84,8 +89,6 @@ namespace PortiaMoxyImport
 
             clearSettleFX(ref items);
 
-          
-
             // based on these values the appropriate conversion function selected
             if (items[4].Equals("$cash")) { tranType = "cash"; } else { tranType = "equity"; }
             if (tradeCur.Equals("USD")) { portType = "Us"; } else { portType = "NonUs"; }
@@ -106,12 +109,7 @@ namespace PortiaMoxyImport
             string funcName; 
             try
             {
-               
-                //if (items[3].Equals ("cacn"))
-                //{
-                //    this.doNotInclude = true;
-                //    return 0;
-                //}
+                               
                 funcName = tranType  +portType + secType + tranCode;
                 Type thisType = this.GetType();
 
@@ -120,7 +118,7 @@ namespace PortiaMoxyImport
                     funcName  = "cashNonUsDiffCurSell02";
 
                 MethodInfo theMethod = thisType.GetMethod(funcName);
-                                                              
+                                                                                                                                                                                 
                 if (theMethod == null)                 
                 {
                     screen.AppendText(Globals.saveErr(String.Format("\r\n-->{0}: Function {1} not found ? ? ?", GetCurrentMethod(), funcName)));
@@ -183,6 +181,9 @@ namespace PortiaMoxyImport
             string tradeDate = items[5];
             string conversionInstruction = null ;
 
+            qtyNum =  Double.Parse( items[8]) ; 
+            tradeAmt = Double.Parse(items[17]);
+
             Screen.AppendText(String.Format("Executing {0} ", GetCurrentMethod()));
                                  
             // replace Moxy src & dest symbols with Portia format like -CAD CASH-
@@ -201,7 +202,7 @@ namespace PortiaMoxyImport
             {
                 if (Double.TryParse(qty, out qtyNum))
                 {
-                    
+
                     crossRateNum = Math.Round(crossRateNum, Globals.RNDNUM);
                     if (conversionInstruction.Equals("d"))
                     {
@@ -211,34 +212,47 @@ namespace PortiaMoxyImport
                     {
                         tradeAmt = Math.Round(qtyNum * crossRateNum, Globals.RNDNUM);
                     }
-                                       
-                    origTradeAmt = Double.Parse(items[17]);   
+
+                    origTradeAmt = Double.Parse(items[17]);
                     items[17] = tradeAmt.ToString();
                 }
                 else
                 {
-                    Screen.AppendText(Globals.saveErr (  String.Format("Function {0} : Qty is unavailable for the trade-->{1}  ", GetCurrentMethod(), String.Join(",", items))  ));
+                    Screen.AppendText(Globals.saveErr(String.Format("Function {0} : Qty is unavailable for the trade-->{1}  ", GetCurrentMethod(), String.Join(",", items))));
                 }
             }
             else
             {
-                Screen.AppendText(Globals.saveErr (Environment.NewLine+  String.Format("Function {0} : Cross rate is unavailable for the trade-->{1}  ", GetCurrentMethod(), String.Join(",", items))  ));
-                Screen.AppendText(Globals.saveErr(Environment.NewLine+ String.Format("Function {0} : Can not convert {1} to number. ", GetCurrentMethod(), crossRate)));
+                Screen.AppendText(Globals.saveErr(Environment.NewLine + String.Format("Function {0} : Cross rate is unavailable for the trade-->{1}  ", GetCurrentMethod(), String.Join(",", items))));
+                Screen.AppendText(Globals.saveErr(Environment.NewLine + String.Format("Function {0} : Can not convert {1} to number. ", GetCurrentMethod(), crossRate)));
 
             }
 
-            // Sec2Port
+            //Sec2Port
             if (conversionInstruction.Equals("d"))
             {
-                items[13] = crossRate;              
+                items[13] = crossRate;
             }
             else
             {
                 if (Double.TryParse(crossRate, out crossRateNum))
+                {
+                    Double tmp = 1 / crossRateNum;
                     items[13] = (1 / crossRateNum).ToString();
+                }
+
             }
-           
- 
+
+            //items[13] =Math.Round((qtyNum / tradeAmt), Globals.RNDNUM).ToString();
+
+            // re-evaluate sec to port
+            if (tradeCur.Equals(securityCur))
+            {
+                // sec2port
+                items[13] = "1";
+            }
+
+
             // sec2base 
             if (securityCur.Equals("USD")) { items[14] = "1"; } else { items[14] = string.Empty; }
 
@@ -247,11 +261,11 @@ namespace PortiaMoxyImport
             
             return rtn;
         }
-
+         
         public int cashNonUsDiffCurSell02()
         {
             int rtn = 0;
-            Double crossRateNum = 0, qtyNum = 0;
+            Double crossRateNum = 0;
             String crossRate = string.Empty;
             Double origQty = 0 ;
             Double origAmt = 0;
@@ -261,8 +275,7 @@ namespace PortiaMoxyImport
             Screen.AppendText(String.Format("Executing {0} ", GetCurrentMethod()));
             try
             {
-                
-
+            
                 // preserve the original amounts
                 origQty = Double.Parse(items[8]);
                 origAmt = Double.Parse(items[17]);
@@ -302,30 +315,33 @@ namespace PortiaMoxyImport
                 items[4] = String.Format("-{0} CASH-", tradeCur);
 
                 // convert qty
-                if (Double.TryParse(crossRate, out crossRateNum))
-                {
+                //if (Double.TryParse(crossRate, out crossRateNum))
+                //{
 
-                        if (conversionInstruction.Equals("d"))
-                        {
-                            items[8] = Math.Round((origQty  / crossRateNum), Globals.RNDNUM).ToString();
-                        }
-                        else
-                        {
-                            items[8] = Math.Round((origQty * crossRateNum), Globals.RNDNUM).ToString();
-                        }
+                //        if (conversionInstruction.Equals("d"))
+                //        {
+                //            items[8] = Math.Round((origQty  / crossRateNum), Globals.RNDNUM).ToString();
+                //        }
+                //        else
+                //        {
+                //            items[8] = Math.Round((origQty * crossRateNum), Globals.RNDNUM).ToString();
+                //        }
 
-                }
-                else
-                {
-                    Screen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " : Cross Rate is unavailable for the trade-->  " + String.Join(",", items)));
-                    Screen.AppendText(Globals.saveErr(Environment.NewLine + String.Format("Function {0} : Can not convert {1} to number. ", GetCurrentMethod(), crossRate)));
-                }
+                //}
+                //else
+                //{
+                //    Screen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " : Cross Rate is unavailable for the trade-->  " + String.Join(",", items)));
+                //    Screen.AppendText(Globals.saveErr(Environment.NewLine + String.Format("Function {0} : Can not convert {1} to number. ", GetCurrentMethod(), crossRate)));
+                //}
 
                 // sec2port
-                if (conversionInstruction.Equals("d"))
-                    items[13] = Math.Round((1 / crossRateNum), Globals.RNDNUM).ToString();
-                else
-                    items[13] = Math.Round((crossRateNum), Globals.RNDNUM).ToString();
+                if (Double.TryParse(crossRate, out crossRateNum))
+                {
+                    if (conversionInstruction.Equals("d"))
+                        items[13] = Math.Round((1 / crossRateNum), Globals.RNDNUM).ToString();
+                    else
+                        items[13] = Math.Round((crossRateNum), Globals.RNDNUM).ToString();
+                }
                 //
                 // reevaluate new security currency after flip
                 //
@@ -334,12 +350,21 @@ namespace PortiaMoxyImport
                 {
                     // sec2port
                     items[13] = "1";
-                }
+                } 
 
                 // sec2Base
-                items[14] =Math.Round( (Double.Parse(items[8]) / origAmt), Globals.RNDNUM).ToString();
+
+                //items[14] =Math.Round( (Double.Parse(items[8]) / origAmt), Globals.RNDNUM).ToString();
+                if (securityCur.Equals("USD")) { items[14] = "1"; } else { items[14] = string.Empty; }
                 // sec2cbal
-                items[15] = Math.Round(Double.Parse(items[8]) / Double.Parse(items[17]), Globals.RNDNUM).ToString();
+                //if (securityCur.Equals("EUR") || securityCur.Equals("GBP") || securityCur.Equals("AUD") || securityCur.Equals("NZD"))
+                if(conversionInstruction.Equals("d") )
+                //items[15] = Math.Round(Double.Parse(items[17]) / Double.Parse(items[8]), Globals.RNDNUM).ToString();
+                    items[15] = (1/Double.Parse(crossRate)).ToString();
+                else
+                    //items[15] = Math.Round(Double.Parse(items[8]) / Double.Parse(items[17]), Globals.RNDNUM).ToString();
+                    items[15] = crossRate;
+                
 
             }
             catch (Exception ex)
@@ -528,7 +553,9 @@ namespace PortiaMoxyImport
                 {
                     Screen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " : Qty or Trade Amount is unavailable for the trade-->  " + String.Join(",", items)));
                 }
+                
 
+                //items[15] = items[13];
 
             }
             catch (Exception ex)
@@ -662,8 +689,23 @@ namespace PortiaMoxyImport
                 if (!Double.TryParse(crossRate, out crossRateNum))
                 {
                     // cross rate is not available
-                    rtn = md.getCrossRate(int.Parse(items[39]), tradeDate , tradeCur, items[3], items[0], ref crossRate, ref conversionInstruction);
+                    rtn = md.getCrossRate02(int.Parse(items[39]), tradeDate , tradeCur, items[3], items[0], ref crossRate, ref conversionInstruction);
                 }
+
+                //
+                // when security currency is USD settle it in USD
+                // when security currency is not USD settle it in trading currency
+                //
+                //string part1 = items[11].ToString().Substring(0, 2);
+               
+                //if (securityCur.Equals("USD"))
+                //{
+                //    items[11] = part1 + securityCur.Substring(0, 2).ToLower();
+                //}
+                //else
+                //{
+                //    items[11] = part1 + tradeCur.Substring(0, 2).ToLower();
+                //}
 
                 // sec2Base 
                 items[14] = items[13];
@@ -675,10 +717,14 @@ namespace PortiaMoxyImport
                 items[15] = "1";
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
 
             }
@@ -713,6 +759,22 @@ namespace PortiaMoxyImport
                     rtn = md.getCrossRate(int.Parse(items[39]), tradeDate , tradeCur, items[3], items[0], ref crossRate, ref conversionInstruction);
                 }
 
+                //
+                // when security currency is USD settle it in USD
+                // when security currency is not USD settle it in trading currency
+                //
+                //string part1 = items[11].ToString().Substring(0, 2);
+               
+                //if (securityCur.Equals("USD"))
+                //{
+                //    items[11] = part1 + securityCur.Substring(0, 2).ToLower();
+                //}
+                //else
+                //{
+                //    items[11] = part1 + tradeCur.Substring(0, 2).ToLower();
+                //}
+
+
                 items[9] = getSellingRule(items[9], items[0]);
 
                 // sec2Base 
@@ -725,10 +787,14 @@ namespace PortiaMoxyImport
                 items[15] = "1";
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
             }
             catch (Exception ex)
@@ -756,13 +822,14 @@ namespace PortiaMoxyImport
 
             try            
             {
-
-
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
                    // if (!Double.TryParse(crossRate, out crossRateNum))
                 //{
@@ -770,8 +837,27 @@ namespace PortiaMoxyImport
                     rtn = md.getCrossRate02(int.Parse(items[39]), tradeDate , tradeCur, items[3], items[0], ref crossRate, ref conversionInstruction);
                 //}
 
+                //
+                // when security currency is USD settle it in USD
+                // when security currency is not USD settle it in trading currency
+                //
+                //string part1 = items[11].ToString().Substring(0, 2);
+                                    
+                //if (securityCur.Equals("USD"))
+                //{
+                //    items[11] = part1 + securityCur.Substring(0, 2).ToLower();
+                //}
+                //else
+                //{
+                //    items[11] = part1 + tradeCur.Substring(0, 2).ToLower();
+                //}
+
+
                 // sec2Base 
-                items[14] = items[13];
+                //if (items[3].ToUpper().Substring(2, 2).Equals("US"))
+                //    items[14] = "1";
+                //else
+                    items[14] = items[13];
 
                 // sec2port
                 if (conversionInstruction.Equals("d"))
@@ -787,7 +873,14 @@ namespace PortiaMoxyImport
                    
 
                 //sec2cbal
-                items[15] = "1";
+                //if(items[3].ToUpper().Substring(2,2).Equals(items[11].ToUpper().Substring(2,2))) {
+                    items[15] = "1";
+                //}
+                //else
+                //{
+                //    items[15] = items[13];
+                //}
+                
             }
             catch (Exception ex)
             {
@@ -815,12 +908,7 @@ namespace PortiaMoxyImport
 
             try
             {
-                if (items[0].Equals("24889"))
-                {
-                    rtn = 0;
-                }
-
-
+               
                 //if (!Double.TryParse(crossRate, out crossRateNum))
                 //{
                     // cross rate is not available
@@ -828,10 +916,29 @@ namespace PortiaMoxyImport
                     rtn = md.getCrossRate02(int.Parse(items[39]), tradeDate, tradeCur, items[3], items[0], ref crossRate, ref conversionInstruction);
                 //}
 
+                //
+                // when security currency is USD settle it in USD
+                // when security currency is not USD settle it in trading currency
+                //
+                //string part1 = items[11].ToString().Substring(0, 2);
+               
+                //if (securityCur.Equals("USD"))
+                //{
+                //    items[11] = part1 + securityCur.Substring(0, 2).ToLower();
+                //}
+                //else
+                //{
+                //    items[11] = part1 + tradeCur.Substring(0, 2).ToLower();
+                //}
+
+
                 items[9] = getSellingRule(items[9], items[0]);
 
                 // sec2Base 
-                items[14] = items[13];
+                //if (items[3].ToUpper().Substring(2, 2).Equals("US"))
+                //    items[14] = "1";
+                //else
+                    items[14] = items[13];
 
                 // sec2port
                 if (Double.TryParse(crossRate, out crossRateNum))
@@ -850,13 +957,23 @@ namespace PortiaMoxyImport
                     //items[13] = Math.Round((1 / crossRateNum), Globals.RNDNUM).ToString();
                 }
                 //sec2cbal
-                items[15] = "1";
+                if (items[3].ToUpper().Substring(2, 2).Equals(items[11].ToUpper().Substring(2, 2)))
+                {
+                    items[15] = "1";
+                }
+                else
+                {
+                    items[15] = items[13];
+                }
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
 
             }
@@ -888,10 +1005,14 @@ namespace PortiaMoxyImport
                 items[15] = "1";
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
             }
             catch (Exception ex)
@@ -924,10 +1045,15 @@ namespace PortiaMoxyImport
                 items[15] = "1";
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
             }
             catch (Exception ex)
@@ -951,17 +1077,55 @@ namespace PortiaMoxyImport
             try
             {
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
 
-                // sec2port
-                items[13] = items[13];
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
+
+                //
+                // when security currency is USD settle it in USD
+                // when security currency is not USD settle it in trading currency
+                //
+                //string part1 = items[11].ToString().Substring(0, 2);
+
+                //if (securityCur.Equals("USD"))
+                //{
+                //    items[11] = part1 + securityCur.Substring(0, 2).ToLower();
+                //}
+                //else
+                //{
+                //    items[11] = part1 + tradeCur.Substring(0, 2).ToLower();
+                //}
+
                 // sec2base
+                //if (items[3].ToUpper().Substring(2, 2).Equals("US"))
+                //    items[14] = "1";
+                //else
                 items[14] = items[13];
                 // sec2cbal
-                items[15] = "1";
+
+
+                // sec2port
+                //items[13] = items[13];
+                if (tradeCur.Equals(repCur))
+                    items[13] = items[13];
+                else
+                    items[13] = string.Empty;
+
+               
+                //if (items[3].ToUpper().Substring(2, 2).Equals(items[11].ToUpper().Substring(2, 2)))
+                //{
+                    items[15] = "1";
+                //}
+                //else
+                //{
+                //    items[15] = items[13];
+                //}
             }
             catch (Exception ex)
             {
@@ -981,24 +1145,41 @@ namespace PortiaMoxyImport
 
             Screen.AppendText(String.Format("Executing {0} ", GetCurrentMethod()));
            
-
-
             try
             {
+               
+                
                 items[9] = getSellingRule(items[9], items[0]);
 
-                // sec2port
-                items[13] = items[13];
                 // sec2base
                 items[14] = items[13];
+
+                // sec2port
+                if (repCur.Equals(tradeCur))
+                    items[13] = items[13];
+                else
+                    items[13] = string.Empty;
+                               
+                  
                 // sec2cbal
-                items[15] = "1";
+                //if (items[3].ToUpper().Substring(2, 2).Equals(items[11].ToUpper().Substring(2, 2)))
+                //{
+                    items[15] = "1";
+                //}
+                //else
+                //{
+                //    items[15] = items[13];
+                //}
 
                 // usupervised tran
-                if (items[3].ToString().Equals("usus"))
-                {
-                    items[12] = "-UNSUP USD-";
-                }
+                string unsupMsg = unsupervisedCheck(items[3].ToString());
+                if (!String.IsNullOrEmpty(unsupMsg))
+                    items[12] = unsupMsg;
+
+                //if (items[3].ToString().Equals("usus"))
+                //{
+                //    items[12] = "-UNSUP USD-";
+                //}
 
             }
             catch (Exception ex)
@@ -1132,6 +1313,35 @@ namespace PortiaMoxyImport
          
             return rtn;
         }
+
+        /// <summary>
+        ///     check if the security type is unsupervised and return unsupervised
+        ///     message with appropriate currency
+        /// </summary>
+        /// <param name="sectype"></param>
+        /// <returns></returns>
+        public String unsupervisedCheck(string sectype)
+        {
+            String rtnMsg = null;
+            try
+            {
+                // check if sectype is unsupervise
+                if (!sectype.StartsWith("u", StringComparison.OrdinalIgnoreCase))
+                    return rtnMsg;
+
+                rtnMsg = $"-UNSUP {securityCur}-";
+                items[34] = "y";   // aim will sent it to Portia as unsupervised
+
+            }
+            catch (Exception ex)
+            {
+                Screen.AppendText(Globals.saveErr("\r\n" + GetCurrentMethod() + " : " + ex.Message));
+                Globals.WriteErrorLog(ex.ToString());
+            }
+
+            return rtnMsg;
+        }
+
 
     }//end of class
 }// end of namespace
