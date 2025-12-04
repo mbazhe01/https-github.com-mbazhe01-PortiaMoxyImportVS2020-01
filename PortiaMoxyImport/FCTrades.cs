@@ -15,11 +15,11 @@ namespace PortiaMoxyImport
     class FCTrades
     {
         ArrayList trades;
-        TextBox screen;
+        RichTextBox screen;
         /// <summary>
         /// Constructor
         /// </summary>
-        public FCTrades(TextBox aScreen)
+        public FCTrades(RichTextBox aScreen)
         {
             screen = aScreen; 
             trades = new ArrayList();
@@ -117,6 +117,7 @@ namespace PortiaMoxyImport
                     }
                     catch (FormatException ex)
                     {
+                    
                         screen.AppendText(Globals.saveErr(String.Format ("/r/n{1}: Unable to convert '{0}' to a date./r/n", aTradeDate1, GetCurrentMethod())));
                         Globals.WriteErrorLog(ex.ToString());
                     }

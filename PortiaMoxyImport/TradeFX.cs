@@ -23,7 +23,7 @@ namespace PortiaMoxyImport
         /// <param name="aDbConnPortia">connection to Portia database</param>
         /// <param name="aTradingCurrencySP">portfolio's trading currency</param>
         /// <param name="aLastCrossRateSP">last availabel cross rate from Portia</param>
-        public TradeFX(TextBox aScreen, string aLine, string aDbConnMoxy, string aDbConnPortia, string aTradingCurrencySP, string aLastCrossRateSP, string aReportingCurrencySP,FCTrades aFcTrades,  string aSellRuleSP)
+        public TradeFX(RichTextBox aScreen, string aLine, string aDbConnMoxy, string aDbConnPortia, string aTradingCurrencySP, string aLastCrossRateSP, string aReportingCurrencySP,FCTrades aFcTrades,  string aSellRuleSP)
             : base(aScreen, aLine, aDbConnMoxy, aDbConnPortia, aTradingCurrencySP, aLastCrossRateSP, aReportingCurrencySP, aSellRuleSP)
         {
           
@@ -195,7 +195,6 @@ namespace PortiaMoxyImport
             }
 
            
-
 
             // Sec2Port
             md.getISOCurrency(items[3], ref cur1);

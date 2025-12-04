@@ -12,11 +12,11 @@ namespace PortiaMoxyImport.Controllers
 {
     class AIMController
     {
-        TextBox tbScreen;
+        RichTextBox tbScreen;
         PortiaDatabase portia;
         MetaData mData;
         MoxyDatabase moxy;
-        public AIMController(TextBox screen, PortiaDatabase pd)
+        public AIMController(RichTextBox screen, PortiaDatabase pd)
         {
             tbScreen = screen;
             portia = pd;

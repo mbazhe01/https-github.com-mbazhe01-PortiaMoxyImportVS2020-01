@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30225.117
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34902.65
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortiaMoxy18Import2024-01", "PortiaMoxyImport\PortiaMoxy18Import2024-01.csproj", "{F5F2D75D-7F81-4D09-A9EB-A545F9BEE507}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortiaMoxy24Import", "PortiaMoxyImport\PortiaMoxy24Import.csproj", "{F5F2D75D-7F81-4D09-A9EB-A545F9BEE507}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortiaMoxyImport.Tests", "PortiaMoxyImport.Tests\PortiaMoxyImport.Tests.csproj", "{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,13 +28,25 @@ Global
 		{F5F2D75D-7F81-4D09-A9EB-A545F9BEE507}.Release|Mixed Platforms.Deploy.0 = Release|x86
 		{F5F2D75D-7F81-4D09-A9EB-A545F9BEE507}.Release|x86.ActiveCfg = Release|x86
 		{F5F2D75D-7F81-4D09-A9EB-A545F9BEE507}.Release|x86.Build.0 = Release|x86
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Debug|x86.Build.0 = Debug|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|x86.ActiveCfg = Release|Any CPU
+		{B57C44DE-ECD8-4303-A47B-8BF567C3D5C8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		VisualSVNWorkingCopyRoot = .
 		SolutionGuid = {13F282A2-02CE-4E29-85BF-72FD67EB50FC}
+		VisualSVNWorkingCopyRoot = .
 	EndGlobalSection
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = PortiaMoxyImport.vsmdi

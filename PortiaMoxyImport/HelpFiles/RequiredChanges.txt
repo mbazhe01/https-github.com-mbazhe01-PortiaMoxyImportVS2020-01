@@ -63,4 +63,6 @@ PortiaMoxyImport Application
 
     1. create function unsupervisedCheck which returns unsupervised message with currency
 
+    07/23/2025
+    1. 57000 - Model protfolio processing
 

@@ -13,13 +13,13 @@ namespace PortiaMoxyImport
     {
         public static String dbConnection;                                                  // DB connection to Portia
         //public static String dbConnectionBilling;                                       // DB connection to BillingWarehouseProtrak
-        public static TextBox screen;
+        public static RichTextBox screen;
         public static string tradingCurrencyStoredProc = string.Empty;    // stored procedure to retrieve protfolio's trading currency
         public static string lastCrossRateStoredProc = string.Empty;
         public static string sellRuleStoredProc = string.Empty;
 
         // constructor
-          public PortiaDatabase(String aDbConnection, TextBox aScreenTextBox, String aTradingCurrencyStoredProc, String aLastCrossRateStoredProc, String aSellRuleStoredProc)
+          public PortiaDatabase(String aDbConnection, RichTextBox aScreenTextBox, String aTradingCurrencyStoredProc, String aLastCrossRateStoredProc, String aSellRuleStoredProc)
         {
             // constructor
             

@@ -13,10 +13,10 @@ namespace PortiaMoxyImport
     class MoxyDatabase
     {
         String dbConnection;
-        TextBox screen;
+        RichTextBox screen;
 
 
-        public MoxyDatabase(String aDbConnection, TextBox aScreenTextBox)
+        public MoxyDatabase(String aDbConnection, RichTextBox aScreenTextBox)
         {
             // constructor
             
@@ -288,7 +288,6 @@ namespace PortiaMoxyImport
                                     
             return rtn;
         }
-
 
         public int flipRate(string aCurrency1, string aCurrency2, ref Boolean aFlipRate)
         {
@@ -641,7 +640,7 @@ namespace PortiaMoxyImport
 
 
         /// <summary>
-        ///     getTradingCurrency function:  retreives portfolio' s trading currency.
+        ///     getTradingCurrency function:  retrieves portfolio' s trading currency.
         ///     
         ///     Note: Trading currency might differ from reporting currency.
         /// </summary>

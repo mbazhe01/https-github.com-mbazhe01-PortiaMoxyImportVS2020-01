@@ -29,8 +29,8 @@ namespace PortiaMoxyImport
         private static int tradeCnt = 0;                                // processed trades counter
         protected MoxyDatabase md;
         PortiaDatabase pd; 
-        public TextBox screen;
-        public TextBox Screen
+        public RichTextBox screen;
+        public RichTextBox Screen
         {
             get
             {
@@ -47,7 +47,7 @@ namespace PortiaMoxyImport
         /// <summary>
         ///                     Constructor
         /// </summary>
-        public Trade(TextBox aScreen, string aLine, string aDbConnMoxy, string aDbConnPortia, string aTradingCurrencySP, string aLastCrossRateSP, string aReportingCurrencySP, string aSellRuleSP)
+        public Trade(RichTextBox aScreen, string aLine, string aDbConnMoxy, string aDbConnPortia, string aTradingCurrencySP, string aLastCrossRateSP, string aReportingCurrencySP, string aSellRuleSP)
         {
             int rtn = 0;
             tradeCnt++;
