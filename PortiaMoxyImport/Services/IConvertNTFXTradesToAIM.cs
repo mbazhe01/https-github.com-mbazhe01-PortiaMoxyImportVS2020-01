@@ -9,6 +9,6 @@ namespace PortiaMoxyImport.Services
 {
     internal interface IConvertNTFXTradesToAIM
     {
-           void  ConvertWithAdjuster();    
+           HashSet<string>  ConvertWithAdjuster();    
     }
 }

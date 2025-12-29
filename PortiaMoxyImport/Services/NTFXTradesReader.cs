@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+//using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace PortiaMoxyImport.Services
 {
@@ -45,6 +46,9 @@ namespace PortiaMoxyImport.Services
 
                         foreach (var row in csv.GetRecords<NTFXTradeCsvRow>())
                         {
+
+                            validateNTFXTradeCsvRow(row);
+
                             var dto = new NTFXTradeDTO(
                                 row.TradeDate,
                                 row.Account,
@@ -72,9 +76,14 @@ namespace PortiaMoxyImport.Services
             });
         }
 
-        public Task<List<NTFXTradeDTO>> GetTradesFromFileAsync(string filePath)
+        private void validateNTFXTradeCsvRow(NTFXTradeCsvRow row)
         {
-            throw new NotImplementedException();
+            if(String.IsNullOrEmpty(row.Account) )
+            {
+                throw new ApplicationException(
+                    "Invalid account : " + row.Account + " for trade " + row.ToString());
+            }
         }
+
     }
 }

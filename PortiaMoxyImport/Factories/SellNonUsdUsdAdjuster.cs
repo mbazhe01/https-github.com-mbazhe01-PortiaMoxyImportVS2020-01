@@ -18,12 +18,13 @@ namespace PortiaMoxyImport.Services
 
         protected override NTFXTradeDTO AdjustCore(NTFXTradeDTO trade)
         {
+            IsImplemented = true;
             // Normalize Sell to Buy by flipping legs & rate
             var buySell = "B";
             decimal forwardRate;
 
             // Base is NON-USD, Other is USD
-            if (!_flipCurrencyList.Contains(trade.OtherCurrency))
+            if (!_flipCurrencyList.Contains(trade.Currency))
             {
                 forwardRate = 1m / trade.ForwardRate;
             }

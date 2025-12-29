@@ -14,6 +14,7 @@ namespace PortiaMoxyImport.Services
         private  List<NTFXTradeDTO> _trades;
         private readonly string _outputFilePath;
         private readonly List<string> _flipCurrencyList;
+        private readonly HashSet<string> _adjusterUsed = new HashSet<string>();
 
         private readonly TradeAdjusterFactory _adjusterFactory;
 
@@ -24,10 +25,10 @@ namespace PortiaMoxyImport.Services
 
             _adjusterFactory = new TradeAdjusterFactory(
                 new BuyUsdNonUsdAdjuster(flipCurrencyList),
-                new BuyNonUsdUsdAdjuster(),
+                new BuyNonUsdUsdAdjuster(flipCurrencyList),
                 new SellUsdNonUsdAdjuster(),
                 new SellNonUsdUsdAdjuster(flipCurrencyList),
-                new BuyNonUsdNonUsdAdjuster(),
+                new BuyNonUsdNonUsdAdjuster(flipCurrencyList),
                 new SellNonUsdNonUsdAdjuster());
             _flipCurrencyList = flipCurrencyList;
         }
@@ -40,8 +41,8 @@ namespace PortiaMoxyImport.Services
             _trades = trades;
             _outputFilePath = outputFilePath;
 
-            string flipCurrencies = Util.getAppConfigVal("FlipRateCurrencies");
-            _flipCurrencyList = flipCurrencies.Split(',').Select(c => c.Trim().ToUpper()).ToList();
+            //string flipCurrencies = Util.getAppConfigVal("FlipRateCurrencies");
+            //_flipCurrencyList = flipCurrencies.Split(',').Select(c => c.Trim().ToUpper()).ToList();
         }
 
 
@@ -89,12 +90,12 @@ namespace PortiaMoxyImport.Services
             fields[12] = "-" + trade.OtherCurrency + " FWD CASH-";
 
             // Column 13: NT forward rate (rounded)
-            fields[13] = FormatRate4Decimals(trade.ForwardRate);
+            //fields[13] = FormatRate6Decimals(trade.ForwardRate);
 
             // Column 14: empty
 
             // Column 15: precise rate (Amount / OtherAmount)
-            //fields[15] = FormatPreciseRate(trade.Amount / trade.OtherAmount.Value);
+            fields[15] = FormatRate6Decimals(trade.ForwardRate);
 
             // Column 16: "y"
             fields[16] = "y";
@@ -227,8 +228,9 @@ namespace PortiaMoxyImport.Services
             }
         }
 
-        public void ConvertWithAdjuster()
+        public HashSet<string> ConvertWithAdjuster()
         {
+            
             try
             {
                 var dir = Path.GetDirectoryName(_outputFilePath);
@@ -239,13 +241,23 @@ namespace PortiaMoxyImport.Services
                 {
                     foreach (var trade in _trades)
                     {
+                        string implementationMsg = "";
                         var adjuster = _adjusterFactory.GetAdjuster(trade);
+                        if (trade.Currency.Equals("EUR"))
+                            trade.Currency = trade.Currency;
                         var adjustedTrade = adjuster.Adjust(trade);
+                        // log adjuster usage
+                        if (!adjuster.IsImplemented)
+                            implementationMsg = "Not implemented yet. Trade pass through.";
 
+                            _adjusterUsed.Add(adjuster.GetType().Name + " : "  + implementationMsg);
+                        
                         var fields = ConvertTradeToAIMRow(adjustedTrade);
                         writer.WriteLine(string.Join(",", fields));
                     }
                 }
+
+                return _adjusterUsed;
             }
             catch (Exception ex)
             {
@@ -275,6 +287,14 @@ namespace PortiaMoxyImport.Services
         {
             decimal nonNegative = Math.Abs(rate);   // ensures positive value
             return nonNegative.ToString("0.####", CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatRate6Decimals(decimal rate)
+        {
+            decimal nonNegative = Math.Abs(rate);
+            decimal rounded = Math.Round(nonNegative, 6, MidpointRounding.AwayFromZero);
+            //return rounded.ToString("0.000000", CultureInfo.InvariantCulture);
+            return nonNegative.ToString("0.######", CultureInfo.InvariantCulture);
         }
 
         private static string FormatPreciseRate(decimal rate)

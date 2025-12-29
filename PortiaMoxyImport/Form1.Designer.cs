@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.tbScreen = new System.Windows.Forms.TextBox();
             this.button1 = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
@@ -39,10 +40,10 @@
             this.btn_Evare = new System.Windows.Forms.Button();
             this.button3 = new System.Windows.Forms.Button();
             this.btn_FXTRades_AIM_New = new System.Windows.Forms.Button();
-            this.buttonMoxyAIM = new System.Windows.Forms.Button();
             this.btn_PortiaToMoxy24 = new System.Windows.Forms.Button();
             this.rtbScreen = new System.Windows.Forms.RichTextBox();
             this.btnNTFXTradesDownload = new System.Windows.Forms.Button();
+            this.btnPortiaToMoxyRedesign = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // tbScreen
@@ -112,7 +113,6 @@
             this.buttonMoxyToAIM.Text = "MOXY -> AIM Trades";
             this.buttonMoxyToAIM.UseVisualStyleBackColor = true;
             this.buttonMoxyToAIM.Visible = false;
-            this.buttonMoxyToAIM.Click += new System.EventHandler(this.buttonMoxyToAIM_Click);
             // 
             // btnPortiaFilesFromImex
             // 
@@ -172,18 +172,6 @@
             this.btn_FXTRades_AIM_New.UseVisualStyleBackColor = true;
             this.btn_FXTRades_AIM_New.Click += new System.EventHandler(this.btn_FXTRades_AIM_New_Click);
             // 
-            // buttonMoxyAIM
-            // 
-            this.buttonMoxyAIM.Location = new System.Drawing.Point(140, 532);
-            this.buttonMoxyAIM.Margin = new System.Windows.Forms.Padding(4);
-            this.buttonMoxyAIM.Name = "buttonMoxyAIM";
-            this.buttonMoxyAIM.Size = new System.Drawing.Size(100, 28);
-            this.buttonMoxyAIM.TabIndex = 14;
-            this.buttonMoxyAIM.Text = "Moxy AIM Test";
-            this.buttonMoxyAIM.UseVisualStyleBackColor = true;
-            this.buttonMoxyAIM.Visible = false;
-            this.buttonMoxyAIM.Click += new System.EventHandler(this.buttonMoxyAIM_Click);
-            // 
             // btn_PortiaToMoxy24
             // 
             this.btn_PortiaToMoxy24.Location = new System.Drawing.Point(32, 494);
@@ -214,15 +202,26 @@
             this.btnNTFXTradesDownload.UseVisualStyleBackColor = true;
             this.btnNTFXTradesDownload.Click += new System.EventHandler(this.btnNTFXTradesDownload_ClickAsync);
             // 
+            // btnPortiaToMoxyRedesign
+            // 
+            this.btnPortiaToMoxyRedesign.Location = new System.Drawing.Point(738, 458);
+            this.btnPortiaToMoxyRedesign.Name = "btnPortiaToMoxyRedesign";
+            this.btnPortiaToMoxyRedesign.Size = new System.Drawing.Size(180, 28);
+            this.btnPortiaToMoxyRedesign.TabIndex = 18;
+            this.btnPortiaToMoxyRedesign.Text = "Portia Moxy Redesign";
+            this.btnPortiaToMoxyRedesign.UseVisualStyleBackColor = true;
+            this.btnPortiaToMoxyRedesign.Visible = false;
+            this.btnPortiaToMoxyRedesign.Click += new System.EventHandler(this.btnPortiaToMoxyRedesign_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(967, 593);
+            this.Controls.Add(this.btnPortiaToMoxyRedesign);
             this.Controls.Add(this.btnNTFXTradesDownload);
             this.Controls.Add(this.rtbScreen);
             this.Controls.Add(this.btn_PortiaToMoxy24);
-            this.Controls.Add(this.buttonMoxyAIM);
             this.Controls.Add(this.btn_FXTRades_AIM_New);
             this.Controls.Add(this.button3);
             this.Controls.Add(this.btn_Evare);
@@ -235,6 +234,7 @@
             this.Controls.Add(this.button1);
             this.Controls.Add(this.tbScreen);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "Form1";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
@@ -258,10 +258,10 @@
         private System.Windows.Forms.Button btn_Evare;
         private System.Windows.Forms.Button button3;
         private System.Windows.Forms.Button btn_FXTRades_AIM_New;
-        private System.Windows.Forms.Button buttonMoxyAIM;
         private System.Windows.Forms.Button btn_PortiaToMoxy24;
         private System.Windows.Forms.RichTextBox rtbScreen;
         private System.Windows.Forms.Button btnNTFXTradesDownload;
+        private System.Windows.Forms.Button btnPortiaToMoxyRedesign;
     }
 }
 

@@ -47,5 +47,12 @@ namespace PortiaMoxyImport.Entities
             ValueDate = valueDate;
             Broker = broker;
         }
-    }
+
+
+        public override String ToString()
+        {
+            return $"NTFXTradeDTO[TradeDate={TradeDate.ToShortDateString()}, Account={Account}, BuySell={BuySell}, Currency={Currency}, Amount={Amount}, OtherCurrency={OtherCurrency}, ForwardRate={ForwardRate}, OtherAmount={OtherAmount}, ValueDate={ValueDate.ToShortDateString()}, Broker={Broker}]";
+        }
+
+    }// end class
 }

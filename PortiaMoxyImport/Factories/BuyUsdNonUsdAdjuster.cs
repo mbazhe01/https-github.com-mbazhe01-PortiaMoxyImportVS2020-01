@@ -18,6 +18,7 @@ namespace PortiaMoxyImport.Services
 
         protected override NTFXTradeDTO AdjustCore(NTFXTradeDTO trade)
         {
+            IsImplemented = true;
             decimal forwardRate;
 
             // Your old logic: Buy, Currency = USD, Other = NONUSD

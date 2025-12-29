@@ -11,6 +11,7 @@ namespace PortiaMoxyImport.Services
     {
         protected override NTFXTradeDTO AdjustCore(NTFXTradeDTO trade)
         {
+            IsImplemented = false;
             // TODO: implement rule for Sell NON-USD / NON-USD
             return new NTFXTradeDTO(
                 trade.TradeDate,

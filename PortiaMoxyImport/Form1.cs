@@ -1,5 +1,7 @@
-﻿using PortiaMoxyImport.Entities;
+﻿using CsvHelper.TypeConversion;
+using PortiaMoxyImport.Entities;
 using PortiaMoxyImport.Forms;
+using PortiaMoxyImport.Redesign;
 using PortiaMoxyImport.Services;
 using System;
 using System.Collections;
@@ -15,6 +17,7 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 
 namespace PortiaMoxyImport
 {
@@ -522,182 +525,7 @@ namespace PortiaMoxyImport
 
         }
 
-        private void buttonMoxyToAIM_Click(object sender, EventArgs e)
-        {
-            //SQLiteDatabase db;
-            string outFolder = string.Empty;
-            string axysPath = string.Empty;
-            string srcFile = string.Empty;                       // the folder where Moxy Export saves moxyaxys.trn file 
-            string fileName = string.Empty;                      // source file name only, No path  
-            string dbConn = string.Empty;                        // Moxy database connection
-            string dbConnPortia = string.Empty;                  // Portia database connection
-            string dbConnBilling = string.Empty;                 // BillingWarehouseProtrak database connection
-            string tradingCurrencyStoredProc = string.Empty;     // stored procedure to retrieve protfolio's trading currency
-            string reportingCurrencyStoredProc = string.Empty;   // stored procedure to retreive portfolio's reporting currency
-            string lastCrossRateStoredProc = string.Empty;
-            string postToAxys = string.Empty;                    // Y or N; indicates if it's necessary to post trades to Axys
-            //int rtn = 0;
-            string tradeCur = string.Empty;                      // portfolio trading currency as defined in Protrak
-            string crossRate = string.Empty;                     // trades cross rate for non-us based portfolios
-            int count = 0;
-            string newLine = string.Empty;
-            string securityCur = string.Empty;                   // the currency of the traded security
-
-            Globals.errCnt = 0;                                                         // reset error counter
-
-            tbScreen.Clear();
-                      
-            if (getAppMetaData(ref outFolder, ref axysPath, ref srcFile, ref dbConn, ref postToAxys, ref tradingCurrencyStoredProc, ref dbConnPortia, ref lastCrossRateStoredProc, ref reportingCurrencyStoredProc) == -1) { return; }
-
-            //
-            // check if the source file exists moxyaxys.trn
-            //
-            if (!File.Exists(srcFile)) { MessageBox.Show(String.Format("File {0} not found please run Moxy Export", srcFile)); return; }
-            //
-            // make a copy of binary source file
-            //
-            String newSrcFile = Path.GetFileNameWithoutExtension(srcFile) + "_" + DateTime.Now.ToString("yyyyMMdd") + "_" + DateTime.Now.ToString("hhmmss") + ".trn";
-            File.Copy(srcFile, outFolder + newSrcFile, true);
-
-            // 
-            // execute imex to export source file
-            //
-            runImexExport(outFolder, axysPath, srcFile);
-            fileName = Path.GetFileName(srcFile);
-
-            //
-            // rename the file to make it CSV and dated
-            //              
-            //
-            // after the test remove time stamp
-            //
-            String newFile = Path.GetFileNameWithoutExtension(outFolder + fileName) + "_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ DateTime.Now.ToString("hhmmss") + ".csv";
-
-            if (File.Exists(outFolder + fileName))
-            {
-
-                try
-                {
-                    File.Copy(outFolder + fileName, outFolder + newFile, true); // this is an initial csv file that we update down the code to fit AIM specs
-                    tbScreen.AppendText("Finished export of " + srcFile + Environment.NewLine);
-                    tbScreen.AppendText("Check for the output in: " + outFolder + Environment.NewLine);
-                    tbScreen.AppendText("File: " + newFile);
-
-
-                    MoxyDatabase md = new MoxyDatabase(dbConn, rtbScreen);
-                    PortiaDatabase pd = new PortiaDatabase(dbConnPortia, rtbScreen, tradingCurrencyStoredProc, lastCrossRateStoredProc, "");
-
-                    if (unfoldSpecificLots(outFolder + newFile) == -1)
-                    {
-                        return;
-                    }
-
-                    string[] lines = File.ReadAllLines(outFolder + newFile);
-                    List<string> newLines = new List<string>();
-
-                    // process Moxy trades file line by line
-                    foreach (string line in lines)
-                    {
-
-                        Application.DoEvents();
-
-                        // this is a comment line - ignore
-                        if (line.IndexOf(";,;,") != -1 || line.IndexOf(",;,") != -1 || line.IndexOf(";;") !=-1) { continue; }
-                                             
-                        count += 1;
-                        lblStatus.Text = String.Format("Processing trade: {0}", count);
-                        ///////////////////////////////////////////////////////////////////////////////////////////////
-                        //                                                                                           //
-                        // analyze & format trades for AIM                                                           //    
-                        //                                                                                           //
-                        ///////////////////////////////////////////////////////////////////////////////////////////////
-                        Trade trade = new Trade(rtbScreen, line, dbConn , dbConnPortia, tradingCurrencyStoredProc , lastCrossRateStoredProc, reportingCurrencyStoredProc, ""  );
-                        trade.convert();
-                        
-                        newLine = String.Join(",", trade.items);
-                        if (!trade.doNotInclude)
-                        {
-                            newLines.Add(newLine);
-                        }
-                        else
-                        {
-
-                            tbScreen.AppendText(String.Format("\r\n-!-!-!-> Excluded cash trade - port & sec currency are the same. : {0}", newLine));
-                        }
-                        
-
-                    } // end of foreach
-
-                    File.WriteAllLines(outFolder + newFile, newLines);
-                    //
-                    // when count > 0 the output file is not empty
-                    //      1. copy source file (moxyaxys.trn) to Axys Folder where post32.exe can see it
-                    //      2. run post32.exe 
-                    //
-
-                    // && postToAxys.ToUpper().Equals ('Y')
-
-                    if (count > 0 && postToAxys.ToUpper().Equals('Y'.ToString()))
-                    {
-                        File.Copy(outFolder + fileName, axysPath + fileName, true);
-                        ProcessStartInfo PostProc = new ProcessStartInfo(axysPath + "post32.exe");
-                        //PostProc.WorkingDirectory = Path.GetDirectoryName(srcFile);
-                       
-                        Process p2;
-                        PostProc.Arguments = " -fmoxyaxys";
-                        PostProc.UseShellExecute = false;
-                        p2 = Process.Start(PostProc);
-                        while (p2.HasExited == false)
-                        {
-                            Application.DoEvents();
-                        }
-
-                    }
-
-
-                    // delete moxyaxys.trn
-                    File.Delete(srcFile);  
-
-                    
-                }
-                catch (Exception exp)
-                {
-                    Globals.saveErr(exp.Message);
-                    Globals.WriteErrorLog(exp.ToString());
-                    MessageBox.Show(exp.Message);
-                    this.Close();
-                    return;
-                }
-
-            }
-            else
-            {
-                Globals.saveErr("--->Failed to create file: " + newFile);
-                return;
-            }
-
-            tbScreen.AppendText(String.Format("\r\n\r\nNumber of trades: {0}", count));
-            tbScreen.AppendText(String.Format("\r\n\r\nNumber of errors: {0}", Globals.errCnt.ToString()));
-            lblStatus.Text = "Ready";
-            Globals.init(); 
-
-
-            //---------------------------TEST----------------//
-            //try
-            //{
-            //    Trade t = new Trade(tbScreen);
-            //    t.convert(); 
-            //}
-            //catch (Exception ex)
-            //{
-            //    tbScreen.AppendText(ex.Message); 
-            //}
-
-
-            
-
-        }
-
+     
         //
         // use imex to convert trn file created by Moxy Export procedure in Moxy
         // to csv file
@@ -3058,36 +2886,36 @@ namespace PortiaMoxyImport
             }
         }
 
-        private void buttonMoxyAIM_Click(object sender, EventArgs e)
-        {
-            Globals.errCnt = 0;           // reset error counter
-            tbScreen.Clear();
+        //private void buttonMoxyAIM_Click(object sender, EventArgs e)
+        //{
+        //    Globals.errCnt = 0;           // reset error counter
+        //    tbScreen.Clear();
                    
-            DateTime asOfDate;
+        //    DateTime asOfDate;
 
-            try
-            {
-                MetaData mData = getAppMetaDataMoxy();
+        //    try
+        //    {
+        //        MetaData mData = getAppMetaDataMoxy();
 
-                // get date - by default is today
-                FormSelectDate frmSelect = new FormSelectDate();
+        //        // get date - by default is today
+        //        FormSelectDate frmSelect = new FormSelectDate();
 
-                if (frmSelect.ShowDialog(this) == DialogResult.OK)
-                {
-                    MoxyDatabase md = new MoxyDatabase(Util.getAppConfigVal("moxyconstr"), rtbScreen);
-                    PortiaDatabase pd = new PortiaDatabase(mData.portiaConStr, rtbScreen, mData.tradingCurrencyStoredProc, mData.lastCrossRateProc, mData.sellRuleStoredProc);
-                    asOfDate = frmSelect.getSelectedDate();
+        //        if (frmSelect.ShowDialog(this) == DialogResult.OK)
+        //        {
+        //            MoxyDatabase md = new MoxyDatabase(Util.getAppConfigVal("moxyconstr"), rtbScreen);
+        //            PortiaDatabase pd = new PortiaDatabase(mData.portiaConStr, rtbScreen, mData.tradingCurrencyStoredProc, mData.lastCrossRateProc, mData.sellRuleStoredProc);
+        //            asOfDate = frmSelect.getSelectedDate();
 
-                    List<TrnLine>  trades = md.getMoxyExport(asOfDate);
-                     tbScreen.AppendText(String.Format("\r\n\r\nNumber of trades: {0}", trades.Count));
+        //            List<TrnLine>  trades = md.getMoxyExport(asOfDate);
+        //             tbScreen.AppendText(String.Format("\r\n\r\nNumber of trades: {0}", trades.Count));
 
-                }
-            } catch(Exception ex)
-            {
-                tbScreen.AppendText(Globals.saveErr(GetCurrentMethod() + ":" + ex.Message + "\r\n"));
-            }
+        //        }
+        //    } catch(Exception ex)
+        //    {
+        //        tbScreen.AppendText(Globals.saveErr(GetCurrentMethod() + ":" + ex.Message + "\r\n"));
+        //    }
 
-        }//eof
+        //}//eof
 
         /// <summary>
         /// Portia holdings to Moxy 24
@@ -3193,18 +3021,22 @@ namespace PortiaMoxyImport
 
                     var config = new SftpConfig
                     {
-                        Host = "data-transfer.lumint.com",
-                        Port = 22,
-                        Username = "reporting_tweedy",
-                        PrivateKeyPath = @"C:\keys\tb_nt_id_rsa",
-                        PrivateKeyPassphrase = "ur+|u9enlv\"z/bQ;!48.",
+                        Host = Util.getAppConfigVal("SftpHost"),
+                        Port =int.Parse( Util.getAppConfigVal("SftpPort")),
+                        Username = Util.getAppConfigVal("SftpUsername"),
+                        PrivateKeyPath = Util.getAppConfigVal("SftpPrivateKeyPath"),
+                        PrivateKeyPassphrase =Util.getAppConfigVal("SftpPrivateKeyPassphrase"),
                         Password = "",
-                        RemoteDirectory = "/",
+                        RemoteDirectory = Util.getAppConfigVal("SftpRemoteDirectory"),
                         FilePattern = filePattern,
-                        LocalDirectory = @"C:\Temp"
+                        LocalDirectory =Util.getAppConfigVal("SftpLocalDirectory")
                     };
 
-                    IDownloadNTFXTrades downloader = new NTSFTPDownloader(config);
+
+                // Clean directory before download
+                CleanOldFiles(config.LocalDirectory, months: 1);
+
+                IDownloadNTFXTrades downloader = new NTSFTPDownloader(config);
                     var localFilePath = await downloader.DownloadFileAsync();
 
                     rtbScreen.AppendText(
@@ -3231,16 +3063,19 @@ namespace PortiaMoxyImport
 
                 IConvertNTFXTradesToAIM converter = new NTFXTradesConverter(trades, outputFilePath, flipCurrencyList);
                 //converter.Convert();
-                converter.ConvertWithAdjuster();
+                HashSet<string> adjustersUsed =  converter.ConvertWithAdjuster();
 
                 //TO DO: check rounding in the output file
 
-
-                //rtbScreen.AppendText($"Converted trades to AIM format and saved to: {outputFilePath}\n");
                 var fileUri = new Uri(outputFilePath).AbsoluteUri;
 
                 rtbScreen.AppendText($"Converted trades to AIM format and saved to:\n");
                 rtbScreen.AppendText(outputFilePath + "\n");
+
+                foreach(var adjuster in adjustersUsed)
+                {
+                    rtbScreen.AppendText($" - Used adjuster: {adjuster}\n");
+                }
 
                 rtbScreen.AppendText($"Link to open the file:\n");
                 rtbScreen.AppendText(fileUri + Environment.NewLine);
@@ -3267,28 +3102,46 @@ namespace PortiaMoxyImport
             }
         }
 
-        private static void AppendHyperlink(RichTextBox box, string displayText, string url)
+          
+
+        private void CleanOldFiles(string directoryPath, int months = 1)
         {
-            string escapedUrl = EscapeForRtf(url);
-            string escapedText = EscapeForRtf(displayText);
+            if (!Directory.Exists(directoryPath))
+                return;
 
-            // RTF hyperfield fragment
-            string rtf =
-                @"{\field{\*\fldinst HYPERLINK """ + escapedUrl +
-                @"""}{\fldrslt " + escapedText + "}}";
+            var cutoff = DateTime.Now.AddMonths(-months);
 
-            box.SelectedRtf = rtf;
+            foreach (var file in Directory.GetFiles(directoryPath))
+            {
+                try
+                {
+                    var info = new FileInfo(file);
+                    if (info.LastWriteTime < cutoff)
+                    {
+                        info.Delete();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't crash the main workflow
+                    Console.WriteLine($"Failed to delete old file '{file}': {ex.Message}");
+                }
+            }
         }
 
-        private static string EscapeForRtf(string text)
+        private void btnPortiaToMoxyRedesign_Click(object sender, EventArgs e)
         {
-            if (text == null) return string.Empty;
+            IConversionReporter reporter = new RichTextBoxConversionReporter(rtbScreen, lblStatus );
 
-            return text
-                .Replace(@"\", @"\\")
-                .Replace("{", @"\{")
-                .Replace("}", @"\}");
+            PortiaMoxyManagerR pm = new PortiaMoxyManagerR(reporter);
+            MoxyDatabase md = new MoxyDatabase(Util.getAppConfigVal("moxy24constr"), reporter);
+
+            List<FileConversionDTO>  fileConversions = md.getFileConversionInfo(
+                Util.getAppConfigVal("getPortiaSrcFilesSP"),
+                Util.getAppConfigVal("getMoxyImportFilesSP"));
+
+            pm.convertPortiaToMoxy(fileConversions);
+
         }
-
     } // end of class
 }  // end of namespace

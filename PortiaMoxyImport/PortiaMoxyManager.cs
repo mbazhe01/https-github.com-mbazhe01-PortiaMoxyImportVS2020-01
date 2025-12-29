@@ -89,12 +89,7 @@ namespace PortiaMoxyImport
             {
                 string[] values = aLine.Split('\t');
 
-                if (values.Length > 1 &&  values[1].Equals("57000"))
-                {
-                    rtn = 1;
-                }
-
-
+               
                 if (values[0] == String.Empty)
                 {
                     screen.AppendText( "!!!--->  checkMandatoryValue: Values are missing at index 0 for " + aLine + Environment.NewLine);
@@ -213,8 +208,7 @@ namespace PortiaMoxyImport
                     {
                         return -1;
                     }
-
-                   
+                                       
                     myList.Add(tmp);
                     rtn += 1;
                     status.Text = String.Format("Row # {0}", rtn.ToString()); 
@@ -252,15 +246,12 @@ namespace PortiaMoxyImport
                    
                 }
 
-
             }
             catch (Exception ex)
             {
                 ShowError(screen,"convertHoliday: " + ex.Message);
-                
                 rtn = -1;
             }
-
 
             return rtn;
         } // end of convertHoliday function
@@ -475,7 +466,6 @@ namespace PortiaMoxyImport
             return rtn;
 
         } // end of convertIndustry
-
 
         /// <summary>
         ///  could be multiple group files from portia
@@ -1433,7 +1423,6 @@ namespace PortiaMoxyImport
             screen.AppendText(bottomLine + Environment.NewLine);
         }
 
-
         public int convertSecurity(String aInFile, String aOutFile)
         {
             int rtn = 0;
@@ -2008,8 +1997,6 @@ namespace PortiaMoxyImport
             return rtn;
         } // end of convertTaxLots function
 
-
-
         public int convertTaxLots24(String aInFile, String aOutFile, HashSet<string> aHSPortfolios)
         {
             int rtn = 0;
@@ -2159,10 +2146,7 @@ namespace PortiaMoxyImport
             }
             return rtn;
         } // end of convertTaxLots function
-
-
-       
-
+                       
         public ArrayList FindDuplicateRows(DataTable dTable, string colName)
         {
             Hashtable hTable = new Hashtable();
@@ -2353,7 +2337,7 @@ namespace PortiaMoxyImport
                         screen.AppendText($"Default case. No file type {fileType}" + Environment.NewLine);
                         break;
                 }
-
+                               
             }
             catch (Exception ex)
             {
@@ -2366,7 +2350,10 @@ namespace PortiaMoxyImport
             screen.SelectionStart = screen.Text.Length;
             screen.ScrollToCaret();
         }
-        
 
+        internal void convertPortiaToMoxy(List<FileConversionDTO> fileConversions)
+        {
+            throw new NotImplementedException();
+        }
     } // end of class
 } // end of namespace

@@ -9,8 +9,17 @@ namespace PortiaMoxyImport.Services
 {
     public class BuyNonUsdNonUsdAdjuster : TradeAdjusterBase
     {
+        private readonly List<string> _flipCurrencyList;
+
+        public BuyNonUsdNonUsdAdjuster(List<string> flipCurrencyList)
+        {
+            _flipCurrencyList = flipCurrencyList;
+        }
+
         protected override NTFXTradeDTO AdjustCore(NTFXTradeDTO trade)
         {
+            IsImplemented = false;
+           
             // TODO: implement rule for Buy NON-USD / NON-USD
             return new NTFXTradeDTO(
                 trade.TradeDate,

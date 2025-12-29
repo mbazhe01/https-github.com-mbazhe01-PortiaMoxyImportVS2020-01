@@ -18,5 +18,10 @@ namespace PortiaMoxyImport.Entities
         public decimal OtherAmount { get; set; }
         public DateTime ValueDate { get; set; }
         public string Broker { get; set; }
+
+        public override string ToString()
+        {
+            return $"{TradeDate.ToShortDateString()}, {Account}, {BuySell}, {Currency}, {Amount}, {OtherCurrency}, {ForwardRate}, {OtherAmount}, {ValueDate.ToShortDateString()}, {Broker}";
+        }
     }
 }

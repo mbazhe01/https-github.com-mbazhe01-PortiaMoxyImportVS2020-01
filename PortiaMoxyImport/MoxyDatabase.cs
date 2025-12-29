@@ -7,6 +7,7 @@ using System.Data;
 using System.Windows.Forms;
 using System.Diagnostics;
 using PortiaMoxyImport.Entities;
+using PortiaMoxyImport.Redesign;
 
 namespace PortiaMoxyImport
 {
@@ -14,6 +15,23 @@ namespace PortiaMoxyImport
     {
         String dbConnection;
         RichTextBox screen;
+        IConversionReporter _reporter;
+
+        public MoxyDatabase(String aDbConnection, IConversionReporter reporter)
+        {
+            // constructor
+
+            dbConnection = aDbConnection;
+            if (String.IsNullOrEmpty(dbConnection))
+            {
+                Globals.saveErr("Moxy connection string is null or empty.");
+                throw new ArgumentNullException("Moxy DB Connection");
+            }
+
+            _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
+
+        }
+
 
 
         public MoxyDatabase(String aDbConnection, RichTextBox aScreenTextBox)
@@ -710,6 +728,47 @@ namespace PortiaMoxyImport
             return sf.GetMethod().Name;
         }
 
+
+        public List<FileConversionDTO> getFileConversionInfo(string inputStoredProc, string outputStoredProc)
+        {
+
+
+            List<FileConversionDTO> fileConversions = new List<FileConversionDTO>();
+            try
+            {
+
+                DataTable dtInput = getSrcFiles(inputStoredProc);
+                DataTable dtOutput = getSrcFiles(outputStoredProc);
+
+                
+                // iterate through results, printing each to console
+                foreach (DataRow row in dtInput.Rows)
+                {
+                    DataRow foundRow = dtOutput.Rows.Find(row["id"]);
+                    if (foundRow == null)
+                    {
+                       
+                        _reporter.Error (String.Format("A row with the primary key of {0} could not be found in {1} ", row["fType"], "outfiles"));
+
+                    }
+
+                    fileConversions.Add(new FileConversionDTO
+                    {
+                        SourceFilePath = row["value"].ToString().Trim(),
+                        TargetFilePath = foundRow["value"].ToString().Trim(),
+                        FileType = row["id"].ToString().Trim()
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                string errMsg = "Function " + GetCurrentMethod() + ":" + e.Message + "\r\n";
+               _reporter.Error(errMsg);
+                Globals.WriteErrorLog(e.ToString());
+                throw new Exception(errMsg);
+            }
+            return fileConversions;
+        }
         /// <summary>
         /// get the files extracted from Portia to import into Moxy
         /// </summary>
