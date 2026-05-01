@@ -44,6 +44,8 @@
             this.rtbScreen = new System.Windows.Forms.RichTextBox();
             this.btnNTFXTradesDownload = new System.Windows.Forms.Button();
             this.btnPortiaToMoxyRedesign = new System.Windows.Forms.Button();
+            this.btn_NTHedges = new System.Windows.Forms.Button();
+            this.btnPendingForwardsNT = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // tbScreen
@@ -53,7 +55,7 @@
             this.tbScreen.Multiline = true;
             this.tbScreen.Name = "tbScreen";
             this.tbScreen.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.tbScreen.Size = new System.Drawing.Size(691, 26);
+            this.tbScreen.Size = new System.Drawing.Size(925, 26);
             this.tbScreen.TabIndex = 0;
             this.tbScreen.Visible = false;
             // 
@@ -116,7 +118,7 @@
             // 
             // btnPortiaFilesFromImex
             // 
-            this.btnPortiaFilesFromImex.Location = new System.Drawing.Point(523, 532);
+            this.btnPortiaFilesFromImex.Location = new System.Drawing.Point(43, 552);
             this.btnPortiaFilesFromImex.Margin = new System.Windows.Forms.Padding(4);
             this.btnPortiaFilesFromImex.Name = "btnPortiaFilesFromImex";
             this.btnPortiaFilesFromImex.Size = new System.Drawing.Size(187, 28);
@@ -213,11 +215,33 @@
             this.btnPortiaToMoxyRedesign.Visible = false;
             this.btnPortiaToMoxyRedesign.Click += new System.EventHandler(this.btnPortiaToMoxyRedesign_Click);
             // 
+            // btn_NTHedges
+            // 
+            this.btn_NTHedges.Location = new System.Drawing.Point(738, 532);
+            this.btn_NTHedges.Name = "btn_NTHedges";
+            this.btn_NTHedges.Size = new System.Drawing.Size(180, 28);
+            this.btn_NTHedges.TabIndex = 19;
+            this.btn_NTHedges.Text = "NT Portia Hedge Exposure";
+            this.btn_NTHedges.UseVisualStyleBackColor = true;
+            this.btn_NTHedges.Click += new System.EventHandler(this.btn_NTHedges_Click);
+            // 
+            // btnPendingForwardsNT
+            // 
+            this.btnPendingForwardsNT.Location = new System.Drawing.Point(523, 530);
+            this.btnPendingForwardsNT.Name = "btnPendingForwardsNT";
+            this.btnPendingForwardsNT.Size = new System.Drawing.Size(180, 28);
+            this.btnPendingForwardsNT.TabIndex = 20;
+            this.btnPendingForwardsNT.Text = "Pending Forwards NT";
+            this.btnPendingForwardsNT.UseVisualStyleBackColor = true;
+            this.btnPendingForwardsNT.Click += new System.EventHandler(this.btnPendingForwardsNT_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(967, 593);
+            this.Controls.Add(this.btnPendingForwardsNT);
+            this.Controls.Add(this.btn_NTHedges);
             this.Controls.Add(this.btnPortiaToMoxyRedesign);
             this.Controls.Add(this.btnNTFXTradesDownload);
             this.Controls.Add(this.rtbScreen);
@@ -262,6 +286,8 @@
         private System.Windows.Forms.RichTextBox rtbScreen;
         private System.Windows.Forms.Button btnNTFXTradesDownload;
         private System.Windows.Forms.Button btnPortiaToMoxyRedesign;
+        private System.Windows.Forms.Button btn_NTHedges;
+        private System.Windows.Forms.Button btnPendingForwardsNT;
     }
 }
 

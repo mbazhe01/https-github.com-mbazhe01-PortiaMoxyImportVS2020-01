@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PortiaMoxyImport.Entities
 {
-    internal class FileConversionDTO
+    public class FileConversionDTO
     {
         public string SourceFilePath { get; set; }
         public string TargetFilePath { get; set; }

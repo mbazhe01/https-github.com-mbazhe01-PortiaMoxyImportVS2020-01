@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PortiaMoxyImport.Entities
 {
-    class TrnLine
+    public class TrnLine
     {
         String portCode;
         String tranCode;

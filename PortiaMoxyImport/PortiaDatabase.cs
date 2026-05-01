@@ -1,11 +1,13 @@
-﻿using System;
+﻿using Microsoft.Office.Interop.Excel;
+using PortiaMoxyImport.PendingForwardsClasses;
+using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
-using System.Data.SqlClient;
-using System.Data;
 using System.Windows.Forms;
-using System.Diagnostics;
 
 namespace PortiaMoxyImport
 {
@@ -219,8 +221,6 @@ namespace PortiaMoxyImport
             return rtn;
         } // end of getReportingCurrency()
 
-
-
         public int getTradingCurrency(string aTradingCurrencyStoredProc, string aPortfolio, ref string aTradingCurrency)
           {
               int rtn = 0;
@@ -266,12 +266,61 @@ namespace PortiaMoxyImport
               return rtn;
           } // end of getTradeCurrency()
 
-          public static string GetCurrentMethod()
+
+        public static PortiaForwardsResult GetPortiaForwards(DateTime tradeDate, string portfolio)
+        {
+            if (string.IsNullOrWhiteSpace(portfolio))
+                return PortiaForwardsResult.Failure("Portfolio cannot be empty.");
+
+            string connStr = Util.getAppConfigVal("portiaconstr");
+            if (string.IsNullOrWhiteSpace(connStr))
+                return PortiaForwardsResult.Failure("Connection string 'portiaconstr' not found in app config.");
+
+            try
+            {
+                System.Data.DataTable dt = new System.Data.DataTable("PortiaForwards");
+                string storedProcName = Util.getAppConfigVal("affirmFXSP");
+                using (SqlConnection conn = new SqlConnection(connStr))
+                using (SqlCommand cmd = new SqlCommand(storedProcName, conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.Add("@TradeDate", SqlDbType.Date).Value = tradeDate.Date;
+                    cmd.Parameters.Add("@Portfolio", SqlDbType.VarChar, 20).Value = portfolio;
+
+                    conn.Open();
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    {
+                        adapter.Fill(dt);
+                    }
+                }
+
+                if (dt.Rows.Count == 0)
+                    return PortiaForwardsResult.Failure(
+                        string.Format("No Portia forwards found for portfolio '{0}' on {1:MM/dd/yyyy}.",
+                            portfolio, tradeDate));
+
+                return PortiaForwardsResult.Ok(dt);
+            }
+            catch (Exception ex)
+            {
+                return PortiaForwardsResult.Failure(
+                    string.Format("Error executing usp_1affirmFX: {0}", ex.Message));
+            }
+        }
+
+        public static string GetCurrentMethod()
           {
               StackTrace st = new StackTrace();
               StackFrame sf = st.GetFrame(1);
 
               return sf.GetMethod().Name;
           }
+
+
+
+
     } // end of lass
+
+
 } // end of namespace

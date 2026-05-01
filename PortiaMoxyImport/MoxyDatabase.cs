@@ -8,10 +8,11 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using PortiaMoxyImport.Entities;
 using PortiaMoxyImport.Redesign;
+using PortiaMoxyImport.HedgeExposureClasses;
 
 namespace PortiaMoxyImport
 {
-    class MoxyDatabase
+    public class MoxyDatabase
     {
         String dbConnection;
         RichTextBox screen;
@@ -31,7 +32,6 @@ namespace PortiaMoxyImport
             _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
 
         }
-
 
 
         public MoxyDatabase(String aDbConnection, RichTextBox aScreenTextBox)
@@ -768,6 +768,52 @@ namespace PortiaMoxyImport
                 throw new Exception(errMsg);
             }
             return fileConversions;
+        }
+
+        public List<NTPortiaPortDto> getNTPortiaPortMap(string sqlFunction)
+        {
+            List<NTPortiaPortDto> ntPortiaPorts = new List<NTPortiaPortDto>();
+            DataTable dt = new DataTable();
+
+            try
+            {
+                
+                using (SqlConnection conn = new SqlConnection(dbConnection))
+                {
+                  
+                    string query = $"SELECT * FROM {sqlFunction}";
+                    // If your sqlFunction string doesn't already have (), add them:
+                    if (!query.Contains("("))
+                    {
+                        query += "()";
+                    }
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        // TVFs must use CommandType.Text, not StoredProcedure
+                        cmd.CommandType = CommandType.Text;
+
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                        {
+                            adapter.Fill(dt);
+                        }
+                    }
+                }
+                // 4. Iterate through results
+                foreach (DataRow row in dt.Rows)
+                {
+                    // row[0] = NTAcctId, row[1] = PortiaPort
+                    ntPortiaPorts.Add(new NTPortiaPortDto(row[0].ToString().Trim(), row[1].ToString().Trim()));
+                }
+            }
+            catch (Exception e)
+            {
+                string errMsg = "Function " + GetCurrentMethod() + ":" + e.Message + "\r\n";
+                _reporter.Error(errMsg);
+                Globals.WriteErrorLog(e.ToString());
+                throw new Exception(errMsg);
+            }
+
+            return ntPortiaPorts;
         }
         /// <summary>
         /// get the files extracted from Portia to import into Moxy

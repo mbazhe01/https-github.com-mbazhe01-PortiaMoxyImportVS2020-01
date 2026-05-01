@@ -37,8 +37,8 @@ namespace PortiaMoxyImport.Redesign
 
         public void Error(string message)
         {
-            AppendLine(message);
-            // Optionally color red, play sound, etc.
+            
+            AppendLine(message, System.Drawing.Color.Red);
         }
 
         public void SetStatus(string message)
@@ -53,15 +53,38 @@ namespace PortiaMoxyImport.Redesign
             _status.Text = string.Empty;
         }
 
-        private void AppendLine(string message)
+        //private void AppendLine(string message)
+        //{
+        //    if (string.IsNullOrEmpty(message))
+        //        return;
+
+        //    _output.AppendText(message + Environment.NewLine);
+        //    _output.ScrollToCaret();
+        //    _output.Refresh();
+        //}
+
+        private void AppendLine(string message, System.Drawing.Color? color = null)
         {
-            if (string.IsNullOrEmpty(message))
+            if (string.IsNullOrWhiteSpace(message))
                 return;
 
+            _output.SelectionStart = _output.TextLength;
+            _output.SelectionLength = 0;
+
+            if (color.HasValue)
+                _output.SelectionColor = color.Value;
+            else
+                _output.SelectionColor = _output.ForeColor;
+
             _output.AppendText(message + Environment.NewLine);
+
+            // Reset color back to default
+            _output.SelectionColor = _output.ForeColor;
+
             _output.ScrollToCaret();
-            _output.Refresh();
         }
+
+
     }
 
 }

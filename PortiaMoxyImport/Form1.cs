@@ -1,23 +1,30 @@
 ﻿using CsvHelper.TypeConversion;
 using PortiaMoxyImport.Entities;
 using PortiaMoxyImport.Forms;
+using PortiaMoxyImport.HedgeExposureClasses;
+using PortiaMoxyImport.PendingForwardsClasses;
 using PortiaMoxyImport.Redesign;
 using PortiaMoxyImport.Services;
+using Renci.SshNet.Security;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;  
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
+using Excel = Microsoft.Office.Interop.Excel;
 
 namespace PortiaMoxyImport
 {
@@ -3004,9 +3011,9 @@ namespace PortiaMoxyImport
                 rtbScreen.Clear();
                 // ask the date for the trades to download
                 // SHOW POPUP DATE PICKER
-                var dlg = new FormSelectDate();
+                var dlg = new FormSelectDate(true);
                 
-                    var result = dlg.ShowDialog(this);
+                var result = dlg.ShowDialog(this);
 
                     if (result != DialogResult.OK)
                     {
@@ -3017,7 +3024,7 @@ namespace PortiaMoxyImport
                     // User selected a date
                     DateTime tradeDate = dlg.getSelectedDate();
                     string dateSuffix = tradeDate.ToString("yyyyMMdd");
-                    string filePattern = "*Tweedy*" + dateSuffix + ".csv";
+                    string filePattern = "*Tweedy Browne - Trade Report*" + dateSuffix + ".csv";
 
                     var config = new SftpConfig
                     {
@@ -3040,19 +3047,19 @@ namespace PortiaMoxyImport
                     var localFilePath = await downloader.DownloadFileAsync();
 
                     rtbScreen.AppendText(
-                        $"Downloaded NT FX trades for {tradeDate:MM/dd/yyyy} → {localFilePath}\r\n");
-                             
-                                
+                        $"Downloaded NT hedges for {tradeDate:MM/dd/yyyy} → {localFilePath}\r\n");
+
+               
                 IGetNTFXTradesFromFile tradeReader = new NTFXTradesReader(localFilePath);
                 List<NTFXTradeDTO> trades = await tradeReader.GetTradesFromFileAsync();
 
                 if(trades.Count == 0)
                 {
-                    rtbScreen.AppendText($"No trades found in the downloaded file{localFilePath}.\n");
+                    rtbScreen.AppendText($"No hedges found in the downloaded file{localFilePath}.\n");
                     return;
                 }
 
-                rtbScreen.AppendText($"Read {trades.Count} trades from the file.\n");
+                rtbScreen.AppendText($"Read {trades.Count} hedged from the file.\n");
 
                 var outputFilePath = Path.Combine(
                     Util.getAppConfigVal("moxyAIMOutFolder"),
@@ -3062,14 +3069,14 @@ namespace PortiaMoxyImport
                 List<string> flipCurrencyList = flipCurrencies.Split(',').Select(c => c.Trim().ToUpper()).ToList();
 
                 IConvertNTFXTradesToAIM converter = new NTFXTradesConverter(trades, outputFilePath, flipCurrencyList);
-                //converter.Convert();
+                
                 HashSet<string> adjustersUsed =  converter.ConvertWithAdjuster();
 
                 //TO DO: check rounding in the output file
 
                 var fileUri = new Uri(outputFilePath).AbsoluteUri;
 
-                rtbScreen.AppendText($"Converted trades to AIM format and saved to:\n");
+                rtbScreen.AppendText($"Compo:\n");
                 rtbScreen.AppendText(outputFilePath + "\n");
 
                 foreach(var adjuster in adjustersUsed)
@@ -3143,5 +3150,835 @@ namespace PortiaMoxyImport
             pm.convertPortiaToMoxy(fileConversions);
 
         }
+
+        /// <summary>
+        /// 1. Download NT hedges from SFTP
+        /// 2. Get Porta report dump for the same date
+        /// 3. Compare the files and analyze the differences
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private async void btn_NTHedges_Click(object sender, EventArgs e)
+        {
+
+            // TODO: validate data
+            // TODO: refactor
+            // TODO: test other functions (buttons) if they are still working after refactoring
+
+            try
+            {
+                rtbScreen.Clear();
+                IConversionReporter reporter = new RichTextBoxConversionReporter(rtbScreen, lblStatus);
+                // ask the date for the trades to download
+                // SHOW POPUP DATE PICKER
+                var dlg = new FormSelectDate(false);
+
+                var result = dlg.ShowDialog(this);
+
+                if (result != DialogResult.OK)
+                {
+                    rtbScreen.AppendText("Trade date selection cancelled.\r\n");
+                    return;
+                }
+
+                // User selected a date
+                DateTime portiaTradeDate = dlg.getSelectedDate();
+                DateTime tradeDate = NextBusinessDay(portiaTradeDate);
+                string dateSuffix = tradeDate.ToString("yyyyMMdd");
+                string portiaDateSuffix = portiaTradeDate.ToString("MMddyyyy");
+                //string filePattern = "*Tweedy Browne - CBS Report*" + dateSuffix + ".csv";
+                string filePattern = "*Tweedy Browne - CBS*MTM*" + dateSuffix + ".csv";
+                string portiaHdgExpFile = string.Empty;
+                string portiaFilePattern = "*curhdgexp*" + portiaDateSuffix + ".csv";
+
+                
+                decimal varianceThreshold = decimal.Parse(
+                            Util.getAppConfigVal("HedgeExposureVariance"),
+                            CultureInfo.InvariantCulture);
+
+
+                var config = new SftpConfig
+                {
+                    Host = Util.getAppConfigVal("SftpHost"),
+                    Port = int.Parse(Util.getAppConfigVal("SftpPort")),
+                    Username = Util.getAppConfigVal("SftpUsername"),
+                    PrivateKeyPath = Util.getAppConfigVal("SftpPrivateKeyPath"),
+                    PrivateKeyPassphrase = Util.getAppConfigVal("SftpPrivateKeyPassphrase"),
+                    Password = "",
+                    RemoteDirectory = Util.getAppConfigVal("SftpRemoteDirectory"),
+                    FilePattern = filePattern,
+                    LocalDirectory = Util.getAppConfigVal("SftpLocalDirectory")
+                };
+
+
+                // Clean directory before download
+                CleanOldFiles(config.LocalDirectory, months: 1);
+
+                IDownloadNTFXTrades downloader = new NTSFTPDownloader(config);
+                var localFilePath = await downloader.DownloadFileAsync();
+
+                rtbScreen.AppendText(
+                    $"\r\nDownloaded NT hedges for {tradeDate:MM/dd/yyyy} → {localFilePath}\r\n");
+
+               
+                string portMapFunction = Util.getAppConfigVal("NTPortiaPortMapFN");
+                MoxyDatabase md = new MoxyDatabase(Util.getAppConfigVal("moxy24constr"), reporter);
+                var ntPortiaPortMap = md.getNTPortiaPortMap(portMapFunction);
+
+                HedgeExposureReader hedgeExposureReader = new HedgeExposureReader(md );
+
+                List<HedgeExposureDto> trades = hedgeExposureReader.ReadFile(localFilePath, ntPortiaPortMap);
+                
+                if (trades.Count == 0)
+                {
+                    reporter.Error($"No trades found in the downloaded file{localFilePath}.\n");
+                    return;
+                }
+
+                rtbScreen.AppendText($"Read {trades.Count} trades from the file.\n");
+
+                var outputFilePath = Path.Combine(
+                    Util.getAppConfigVal("hedgeExposureOutFolder"),
+                    $"NTHedgeWxposure_Vs_Portia_{Environment.UserName}_{portiaTradeDate:yyyyMMdd}.xlsx");
+                            
+
+                var fileUri = new Uri(outputFilePath).AbsoluteUri;
+
+                reporter.Info($"Converted hedges to be compared:\n");
+                reporter.Info(outputFilePath + "\n");
+
+                // get the matching Portia report dump for the same date
+                portiaHdgExpFile = Directory.GetFiles(Util.getAppConfigVal("hedgeExposurePoriaFolder"), portiaFilePattern).FirstOrDefault();
+                if (string.IsNullOrEmpty(portiaHdgExpFile) || !File.Exists(portiaHdgExpFile))
+                {
+                    reporter.Error($"Could not find Portia hedge exposure file with pattern {portiaFilePattern} in folder {Util.getAppConfigVal("hedgeExposurePoriaFolder")}");
+                    return;
+                }
+
+                List<PortiaHdgExposureDto> portiaHedges = hedgeExposureReader.ReadPortiaFile(portiaHdgExpFile);
+
+                var uniquePortCurPairs = getUniquePortCurPairs(trades, portiaHedges);
+
+                var stopwatch = Stopwatch.StartNew();
+
+                ExportToExcelInterop_ObjectArray(uniquePortCurPairs, outputFilePath, trades, portiaHedges, varianceThreshold);
+
+                stopwatch.Stop();
+
+                reporter.Info($"Export took {stopwatch.ElapsedMilliseconds} ms");
+                
+                reporter.Info($"Link to open the file:\n");
+                reporter.Info(fileUri + Environment.NewLine);
+                reporter.Info("\n");
+
+
+            }
+            catch (Exception ex)
+            {
+                HandleError(ex, closeForm: false);
+                ShowError(rtbScreen, ex.Message);
+            }
+        }
+
+        private DateTime NextBusinessDay(DateTime portiaTradeDate)
+        {
+            DateTime next = portiaTradeDate.AddDays(1);
+
+            while (next.DayOfWeek == DayOfWeek.Saturday || next.DayOfWeek == DayOfWeek.Sunday)
+            {
+                next = next.AddDays(1);
+            }
+
+            return next;
+        }
+
+        List<PortCur> getUniquePortCurPairs(List<HedgeExposureDto> list1, List<PortiaHdgExposureDto> list2)
+        {
+            HashSet<PortCur> uniquePairs = new HashSet<PortCur>();
+           
+            foreach(var item in list1)
+            {
+                uniquePairs.Add(new PortCur { Port = item.AccountId, Currency = item.LocalCurrencyCode });
+            }
+
+            foreach (var item in list2)
+            {
+                uniquePairs.Add(new PortCur { Port = item.Account, Currency = item.Security });
+            }
+
+            // Sort by Port first, then by Currency
+            return uniquePairs
+                .OrderBy(x => x.Port)
+                .ThenBy(x => x.Currency)
+                .ToList();
+        }
+
+        public void ExportToExcelInterop(List<PortCur> sortedList, string filePath, List<HedgeExposureDto> trades, List<PortiaHdgExposureDto> portiaHedges)
+        {
+            Excel.Application excelApp = new Excel.Application();
+            if (excelApp == null) throw new Exception("Excel is not installed.");
+
+            Excel.Workbooks workbooks = excelApp.Workbooks;
+            Excel.Workbook workbook = workbooks.Add(Type.Missing);
+            Excel.Worksheet worksheet = (Excel.Worksheet)workbook.ActiveSheet;
+
+            try
+            {
+                // 1. Set Headers
+                worksheet.Cells[1, 1] = "Port";
+                worksheet.Cells[1, 2] = "Currency";
+                worksheet.Cells[1, 3] = "Hedge Exposure (NT)";
+                worksheet.Cells[1, 4] = "Hedge Exposure (Portia)";
+                worksheet.Cells[1, 5] = "Diff";
+                worksheet.Cells[1, 6] = "Pct Diff";
+                worksheet.Cells[1, 7] = "Total Base MTM (NT)";
+                worksheet.Cells[1, 8] = "Market Val FWRDS (Portia)";
+                worksheet.Cells[1, 9] = "Diff";
+                worksheet.Cells[1, 10] = "Pct Diff";
+                worksheet.Cells[1, 11] = "Base Amt To be adjusted (NT)";
+                worksheet.Cells[1, 12] = "Hedge AMount (Portia)";
+                worksheet.Cells[1, 13] = "Diff";
+                worksheet.Cells[1, 14] = "Pct Diff";
+                worksheet.Cells[1, 15] = "NT Date";
+                worksheet.Cells[1, 16] = "Portia Date";
+
+
+                // 2. Loop through list and write data (starts at row 2)
+                int row = 2;
+                string currentPort = null;
+                bool useGreen = true;
+                foreach (var item in sortedList)
+                {
+                    // Detect portfolio change
+                    if (currentPort != item.Port)
+                    {
+                        currentPort = item.Port;
+                        useGreen = !useGreen; // flip color
+                    }
+                    worksheet.Cells[row, 1] = item.Port;
+                    worksheet.Cells[row, 2] = item.Currency;
+                    decimal totalBaseHedgeExposure = trades
+                        .Where(t => t.AccountId == item.Port && t.LocalCurrencyCode == item.Currency)
+                        .Sum(t => t.TotalBaseHedgeExposure);
+
+                    decimal mktValue = portiaHedges
+                        .Where(p => p.Account == item.Port && p.Security == item.Currency)
+                        .Sum(p => p.MarketValueStocks);
+
+                    // 2. Calculate Absolute Difference
+                    decimal difference = Math.Abs(totalBaseHedgeExposure - mktValue);
+
+                    // 3. Calculate Variance % safely
+                    decimal variance = 0;
+                    if (Math.Abs(totalBaseHedgeExposure) > 0)
+                    {
+                        variance = difference / Math.Abs(totalBaseHedgeExposure);
+                    }
+                    else if (mktValue != 0)
+                    {
+                        // If we expected 0 (trades) but found value (mkt), it's a 100% variance
+                        variance = 1;
+                    }
+
+
+                    worksheet.Cells[row, 3] = totalBaseHedgeExposure;
+                    worksheet.Cells[row, 4] = mktValue;
+                    worksheet.Cells[row, 5] = difference;
+                    worksheet.Cells[row, 6] = variance ; // Avoid division by zero
+
+                    decimal totalBaseMTM = trades
+                        .Where(t => t.AccountId == item.Port && t.LocalCurrencyCode == item.Currency)
+                        .Sum(t => t.TotalBaseMtm);
+
+                    decimal mktValueFwrds = portiaHedges
+                        .Where(p => p.Account == item.Port && p.Security == item.Currency)
+                        .Sum(p => p.MarketValueForwards);
+
+                    // 2. Calculate Absolute Difference
+                    difference = Math.Abs(totalBaseMTM - mktValueFwrds);
+
+                    // 3. Calculate Variance % safely
+                    variance = 0;
+                    if (Math.Abs(totalBaseMTM) > 0)
+                    {
+                        variance = difference / Math.Abs(totalBaseMTM);
+                    }
+                    else if (mktValueFwrds != 0)
+                    {
+                        // If we expected 0 (trades) but found value (mkt), it's a 100% variance
+                        variance = 1;
+                    }
+
+                    worksheet.Cells[row, 7] = totalBaseMTM;
+                    worksheet.Cells[row, 8] = mktValueFwrds;
+                    worksheet.Cells[row, 9] = difference;
+                    worksheet.Cells[row, 10] = variance ; // Avoid division by zero
+
+                    decimal baseAmt = trades
+                        .Where(t => t.AccountId == item.Port && t.LocalCurrencyCode == item.Currency)
+                        .Sum(t => t.BaseAmountToBeAdjusted);
+
+                    decimal hedgeAmount = portiaHedges
+                        .Where(p => p.Account == item.Port && p.Security == item.Currency)
+                        .Sum(p => p.HedgeAmount);
+
+                    // 2. Calculate Absolute Difference
+                    difference = Math.Abs(baseAmt - hedgeAmount);
+                    // 3. Calculate Variance % safely
+                    variance = 0;
+                    if (Math.Abs(baseAmt) > 0)
+                    {
+                        variance = difference / Math.Abs(baseAmt);
+                    }
+                    else if (hedgeAmount != 0)
+                    {
+                        // If we expected 0 (trades) but found value (mkt), it's a 100% variance
+                        variance = 1;
+                    }
+
+                    worksheet.Cells[row, 11] = baseAmt;
+                    worksheet.Cells[row, 12] = hedgeAmount;
+                    worksheet.Cells[row, 13] = difference;
+                    worksheet.Cells[row, 14] = variance ;
+
+                    worksheet.Cells[row, 15] = trades
+                     .Where(t => t.AccountId == item.Port && t.LocalCurrencyCode == item.Currency)
+                     .Max(t => (DateTime?)t.LedgerDate);
+
+                    worksheet.Cells[row, 15] = trades
+                     .Where(t => t.AccountId == item.Port && t.LocalCurrencyCode == item.Currency)
+                     .Max(t => (DateTime?)t.LedgerDate);
+
+                    worksheet.Cells[row, 16] = portiaHedges
+                    .Where(p => p.Account == item.Port && p.Security == item.Currency)
+                    .Max(p => (DateTime?)p.AsOfDate);
+
+                    Excel.Range dataRow = worksheet.Range[
+                        worksheet.Cells[row, 1],
+                        worksheet.Cells[row, 16]
+                    ];
+
+                    if (useGreen)
+                    {
+                        dataRow.Interior.Color =
+                                         System.Drawing.ColorTranslator.ToOle(
+                                             System.Drawing.Color.FromArgb(226, 239, 218)); // soft green
+
+                    }
+                    else
+                    {
+                        dataRow.Interior.Color =
+                                            System.Drawing.ColorTranslator.ToOle(
+                                                System.Drawing.Color.FromArgb(221, 235, 247)); // soft blue
+                    }
+
+
+                    worksheet.Cells[row, 6].NumberFormat = "0.00%";
+                    Excel.Range cell = (Excel.Range)worksheet.Cells[row, 6];
+                    decimal cellVal = 0m;
+
+                    if (cell.Value2 != null)
+                    {
+                        cellVal = Convert.ToDecimal(cell.Value2);
+                        if (cellVal > 0.05m) // highlight in red if variance > 5%
+                        {
+                            cell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Red);
+                            cell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                        }
+                    }
+
+                    worksheet.Cells[row, 10].NumberFormat = "0.00%";
+                    cell = (Excel.Range)worksheet.Cells[row, 10];
+                    cellVal = 0m;
+
+                    if (cell.Value2 != null)
+                    {
+                        cellVal = Convert.ToDecimal(cell.Value2);
+                        if (cellVal > 0.05m) // highlight in red if variance > 5%
+                        {
+                            cell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Red);
+                            cell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                        }
+                    }
+
+                    worksheet.Cells[row, 14].NumberFormat = "0.00%";
+                    cell = (Excel.Range)worksheet.Cells[row, 14];
+                    cellVal = 0m;
+
+                    if (cell.Value2 != null)
+                    {
+                        cellVal = Convert.ToDecimal(cell.Value2);
+                        if (cellVal > 0.05m) // highlight in red if variance > 5%
+                        {
+                            cell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Red);
+                            cell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                        }
+                    }
+
+
+                    row++;
+                }
+
+                // 3. Formatting
+                Excel.Range headerRange = worksheet.Range["A1", "P1"];
+                headerRange.Font.Bold = true;
+                worksheet.Columns.AutoFit();
+                // 2. Select cell A2 (the first cell below the header you want to freeze)
+                worksheet.Range["A2"].Select();
+
+                // 3. Freeze the panes relative to the selection
+                excelApp.ActiveWindow.FreezePanes = true;
+
+                // 4. Save and Close
+                workbook.SaveAs(filePath);
+                workbook.Close();
+            }
+            finally
+            {
+                // 5. CRITICAL: Clean up COM objects to prevent "ghost" Excel processes
+                excelApp.Quit();
+                Marshal.ReleaseComObject(worksheet);
+                Marshal.ReleaseComObject(workbook);
+                Marshal.ReleaseComObject(workbooks);
+                Marshal.ReleaseComObject(excelApp);
+            }
+        }
+
+  
+public void ExportToExcelInterop_ObjectArray(
+    List<PortCur> sortedList,
+    string filePath,
+    List<HedgeExposureDto> trades,
+    List<PortiaHdgExposureDto> portiaHedges,
+    decimal hedgeExposureVariance)
+    {
+        Excel.Application excelApp = null;
+        Excel.Workbooks workbooks = null;
+        Excel.Workbook workbook = null;
+        Excel.Worksheet worksheet = null;
+
+        try
+        {
+            excelApp = new Excel.Application();
+            if (excelApp == null) throw new Exception("Excel is not installed.");
+
+            workbooks = excelApp.Workbooks;
+            workbook = workbooks.Add(Type.Missing);
+            worksheet = (Excel.Worksheet)workbook.ActiveSheet;
+
+            // 1) Headers (single write)
+            string[] headers =
+            {
+            "Port", "Currency",
+            "Hedge Exposure (NT)", "Hedge Exposure (Portia)", "Diff", "Pct Diff",
+            "Total Base MTM (NT)", "Market Val FWRDS (Portia)", "Diff", "Pct Diff",
+            "Base Amt To be adjusted (NT)", "Hedge AMount (Portia)", "Diff", "Pct Diff",
+            "NT Date", "Portia Date"
+        };
+
+            var headerArr = Array.CreateInstance(typeof(object), new[] { 1, headers.Length }, new[] { 1, 1 });
+            for (int c = 1; c <= headers.Length; c++)
+                headerArr.SetValue(headers[c - 1], 1, c);
+
+            Excel.Range headerRange = worksheet.Range["A1", "P1"];
+            headerRange.Value2 = headerArr;
+            headerRange.Font.Bold = true;
+
+            // 2) Pre-group once (fast lookups; small data but clean & scalable)
+            var tradesByKey = trades
+                .GroupBy(t => new Key(t.AccountId, t.LocalCurrencyCode))
+                .ToDictionary(g => g.Key, g => new TradeAgg(
+                    totalBaseHedgeExposure: g.Sum(x => x.TotalBaseHedgeExposure),
+                    totalBaseMtm: g.Sum(x => x.TotalBaseMtm),
+                    baseAmtToAdjust: g.Sum(x => x.BaseAmountToBeAdjusted),
+                    maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate)
+                ));
+
+            var portiaByKey = portiaHedges
+                .GroupBy(p => new Key(p.Account, p.Security))
+                .ToDictionary(g => g.Key, g => new PortiaAgg(
+                    marketValueStocks: g.Sum(x => x.MarketValueStocks),
+                    marketValueForwards: g.Sum(x => x.MarketValueForwards),
+                    hedgeAmount: g.Sum(x => x.HedgeAmount),
+                    maxAsOfDate: g.Max(x => (DateTime?)x.AsOfDate)
+                ));
+
+            // 3) Build data array in memory (single Excel write)
+            int rowCount = sortedList.Count;
+            const int colCount = 16;
+
+            // 1-based 2D array for Excel
+            var dataArr = Array.CreateInstance(typeof(object), new[] { rowCount, colCount }, new[] { 1, 1 });
+
+            for (int i = 0; i < rowCount; i++)
+            {
+                var item = sortedList[i];
+                var key = new Key(item.Port, item.Currency);
+
+                tradesByKey.TryGetValue(key, out var tAgg);
+                portiaByKey.TryGetValue(key, out var pAgg);
+
+                decimal totalBaseHedgeExposure = tAgg?.TotalBaseHedgeExposure ?? 0m;
+                decimal mktValueStocks = pAgg?.MarketValueStocks ?? 0m;
+                var v1 = CalcVariance(totalBaseHedgeExposure, mktValueStocks);
+
+                decimal totalBaseMtm = tAgg?.TotalBaseMtm ?? 0m;
+                decimal mktValueFwrds = pAgg?.MarketValueForwards ?? 0m;
+                var v2 = CalcVariance(totalBaseMtm, mktValueFwrds);
+
+                decimal baseAmt = tAgg?.BaseAmtToAdjust ?? 0m;
+                decimal hedgeAmt = pAgg?.HedgeAmount ?? 0m;
+                var v3 = CalcVariance(baseAmt, hedgeAmt);
+
+                DateTime? ntDate = tAgg?.MaxLedgerDate;
+                DateTime? portiaDate = pAgg?.MaxAsOfDate;
+
+                int r = i + 1;
+
+                // A..P
+                dataArr.SetValue(item.Port, r, 1);
+                dataArr.SetValue(item.Currency, r, 2);
+
+                dataArr.SetValue(totalBaseHedgeExposure, r, 3);
+                dataArr.SetValue(mktValueStocks, r, 4);
+                dataArr.SetValue(v1.Difference, r, 5);
+                dataArr.SetValue(v1.Variance, r, 6); // fraction (0.12 => 12%)
+
+                dataArr.SetValue(totalBaseMtm, r, 7);
+                dataArr.SetValue(mktValueFwrds, r, 8);
+                dataArr.SetValue(v2.Difference, r, 9);
+                dataArr.SetValue(v2.Variance, r, 10);
+
+                dataArr.SetValue(baseAmt, r, 11);
+                dataArr.SetValue(hedgeAmt, r, 12);
+                dataArr.SetValue(v3.Difference, r, 13);
+                dataArr.SetValue(v3.Variance, r, 14);
+
+                dataArr.SetValue(ntDate, r, 15);
+                dataArr.SetValue(portiaDate, r, 16);
+            }
+
+            int firstDataRow = 2;
+            int lastDataRow = firstDataRow + rowCount - 1;
+
+            Excel.Range dataRange = worksheet.Range[
+                worksheet.Cells[firstDataRow, 1],
+                worksheet.Cells[lastDataRow, colCount]
+            ];
+
+            dataRange.Value2 = dataArr; // ✅ single write
+
+            // 4) Formatting (done in big blocks)
+            // Percent columns: F, J, N
+            Excel.Range varianceRange1 = worksheet.Range[worksheet.Cells[firstDataRow, 6], worksheet.Cells[lastDataRow, 6]];
+            Excel.Range varianceRange2 = worksheet.Range[worksheet.Cells[firstDataRow, 10], worksheet.Cells[lastDataRow, 10]];
+            Excel.Range varianceRange3 = worksheet.Range[worksheet.Cells[firstDataRow, 14], worksheet.Cells[lastDataRow, 14]];
+
+            varianceRange1.NumberFormat = "0.00%";
+            varianceRange2.NumberFormat = "0.00%";
+            varianceRange3.NumberFormat = "0.00%";
+
+            // Date columns: O, P (optional)
+            Excel.Range dateRange = worksheet.Range[worksheet.Cells[firstDataRow, 15], worksheet.Cells[lastDataRow, 16]];
+            dateRange.NumberFormat = "mm/dd/yyyy";
+
+            // 5) Conditional formatting: variance > 5% => red background + white font
+            ApplyVarianceConditionalFormatting(varianceRange1, hedgeExposureVariance);
+            ApplyVarianceConditionalFormatting(varianceRange2, hedgeExposureVariance);
+            ApplyVarianceConditionalFormatting(varianceRange3, hedgeExposureVariance);
+
+            // 6) Shade rows by portfolio group (still a loop, but cheap and readable)
+            ShadeRowsByPortfolio(worksheet, sortedList, firstDataRow, colCount);
+
+            worksheet.Columns.AutoFit();
+
+            worksheet.Range["A2"].Select();
+            excelApp.ActiveWindow.FreezePanes = true;
+
+            workbook.SaveAs(filePath);
+            workbook.Close();
+        }
+        finally
+        {
+            if (excelApp != null) excelApp.Quit();
+
+            SafeReleaseComObject(worksheet);
+            SafeReleaseComObject(workbook);
+            SafeReleaseComObject(workbooks);
+            SafeReleaseComObject(excelApp);
+        }
+    }
+
+    private static void ApplyVarianceConditionalFormatting(Excel.Range range, decimal threshold)
+    {
+        // Clear existing CF on that range (optional; remove if you want to keep)
+        range.FormatConditions.Delete();
+
+        // Add a cell-value rule: Cell Value > 0.05
+        Excel.FormatCondition fc = (Excel.FormatCondition)range.FormatConditions.Add(
+            Type: Excel.XlFormatConditionType.xlCellValue,
+            Operator: Excel.XlFormatConditionOperator.xlGreater,
+            Formula1: threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        );
+
+        fc.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Red);
+        fc.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+
+        SafeReleaseComObject(fc);
+    }
+
+    private static void ShadeRowsByPortfolio(Excel.Worksheet worksheet, List<PortCur> sortedList, int firstDataRow, int colCount)
+    {
+        int softGreen = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(226, 239, 218));
+        int softBlue = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(221, 235, 247));
+
+        string currentPort = null;
+        bool useGreen = true;
+
+        for (int i = 0; i < sortedList.Count; i++)
+        {
+            var item = sortedList[i];
+
+            if (!string.Equals(currentPort, item.Port, StringComparison.OrdinalIgnoreCase))
+            {
+                currentPort = item.Port;
+                useGreen = !useGreen;
+            }
+
+            int excelRow = firstDataRow + i;
+            Excel.Range rowRange = worksheet.Range[worksheet.Cells[excelRow, 1], worksheet.Cells[excelRow, colCount]];
+            rowRange.Interior.Color = useGreen ? softGreen : softBlue;
+
+            SafeReleaseComObject(rowRange);
+        }
+    }
+
+    private static VarianceResult CalcVariance(decimal expected, decimal actual)
+    {
+        decimal difference = Math.Abs(expected - actual);
+
+        decimal variance = 0m;
+        if (Math.Abs(expected) > 0m)
+            variance = difference / Math.Abs(expected);
+        else if (actual != 0m)
+            variance = 1m;
+
+        return new VarianceResult(difference, variance);
+    }
+
+    private readonly struct VarianceResult
+    {
+        public VarianceResult(decimal difference, decimal variance)
+        {
+            Difference = difference;
+            Variance = variance;
+        }
+
+        public decimal Difference { get; }
+        public decimal Variance { get; }
+    }
+
+    private sealed class TradeAgg
+    {
+        public TradeAgg(decimal totalBaseHedgeExposure, decimal totalBaseMtm, decimal baseAmtToAdjust, DateTime? maxLedgerDate)
+        {
+            TotalBaseHedgeExposure = totalBaseHedgeExposure;
+            TotalBaseMtm = totalBaseMtm;
+            BaseAmtToAdjust = baseAmtToAdjust;
+            MaxLedgerDate = maxLedgerDate;
+        }
+
+        public decimal TotalBaseHedgeExposure { get; }
+        public decimal TotalBaseMtm { get; }
+        public decimal BaseAmtToAdjust { get; }
+        public DateTime? MaxLedgerDate { get; }
+    }
+
+    private sealed class PortiaAgg
+    {
+        public PortiaAgg(decimal marketValueStocks, decimal marketValueForwards, decimal hedgeAmount, DateTime? maxAsOfDate)
+        {
+            MarketValueStocks = marketValueStocks;
+            MarketValueForwards = marketValueForwards;
+            HedgeAmount = hedgeAmount;
+            MaxAsOfDate = maxAsOfDate;
+        }
+
+        public decimal MarketValueStocks { get; }
+        public decimal MarketValueForwards { get; }
+        public decimal HedgeAmount { get; }
+        public DateTime? MaxAsOfDate { get; }
+    }
+
+    private readonly struct Key : IEquatable<Key>
+    {
+        public Key(string port, string currency)
+        {
+            Port = port ?? string.Empty;
+            Currency = currency ?? string.Empty;
+        }
+
+        public string Port { get; }
+        public string Currency { get; }
+
+        public bool Equals(Key other) =>
+            string.Equals(Port, other.Port, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(Currency, other.Currency, StringComparison.OrdinalIgnoreCase);
+
+        public override bool Equals(object obj) => obj is Key other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int h1 = StringComparer.OrdinalIgnoreCase.GetHashCode(Port);
+                int h2 = StringComparer.OrdinalIgnoreCase.GetHashCode(Currency);
+                return (h1 * 397) ^ h2;
+            }
+        }
+}
+
+
+
+
+        private static void SafeReleaseComObject(object comObj)
+        {
+            if (comObj != null && Marshal.IsComObject(comObj))
+                Marshal.ReleaseComObject(comObj);
+        }
+
+        private void btnPendingForwardsNT_Click(object sender, EventArgs e)
+        {
+            // TODO: compare Portia forwards with NT pending forwards (similar to hedges but different source file + Portia columns)
+
+            // 1. Ask user for trade date (show date picker dialog)
+
+           
+            try
+            {
+                rtbScreen.Clear();
+                IConversionReporter reporter = new RichTextBoxConversionReporter(rtbScreen, lblStatus);
+                // ask the date for the trades to download
+                // SHOW POPUP DATE PICKER
+                var dlg = new FormSelectDate(false);
+
+                var result = dlg.ShowDialog(this);
+                // 2. check if Tb20 & TB10 pending forward files are available for that date (file pattern match in specific folder)
+                if (result != DialogResult.OK)
+                {
+                    rtbScreen.AppendText("Trade date selection cancelled.\r\n");
+                    return;
+                }
+                DateTime tradeDate = dlg.getSelectedDate();
+
+
+                PortiaForwardsResult portiaResultTB10 = PortiaDatabase.GetPortiaForwards(tradeDate, "55093");
+                if (!portiaResultTB10.Success)
+                {
+                    reporter.Error(portiaResultTB10.ErrorMessage);
+                    
+                }
+
+                PortiaForwardsResult portiaResultTB20 = PortiaDatabase.GetPortiaForwards(tradeDate, "55090");
+                if (!portiaResultTB20.Success)
+                {
+                    reporter.Error(portiaResultTB20.ErrorMessage);
+                    
+                }
+
+                if(!portiaResultTB10.Success || !portiaResultTB20.Success)
+                {
+                    reporter.Error("Could not retrieve Portia forwards data for TB10 and/or TB20. Aborting comparison.");
+                    return;
+                }
+
+                // find source files based on date and config folder + file pattern
+                string tb10SrcFolder = Util.getAppConfigVal("TB10pendingForwardsFolder");
+                string tb20SrcFolder = Util.getAppConfigVal("TB20pendingForwardsFolder");
+
+                if(!Directory.Exists(tb10SrcFolder) )
+                {
+                    reporter.Error($"TB10 pending forwards folder not found: {tb10SrcFolder}");
+                    return;
+                }
+
+                if (!Directory.Exists(tb20SrcFolder))
+                {
+                    reporter.Error($"TB20 pending forwards folder not found: {tb20SrcFolder}");
+                    return;
+                }
+
+               
+
+                PendingForwardsResult pendingForwardsResult = Util.LoadSourceFiles(tb10SrcFolder, tb20SrcFolder, tradeDate);
+                if (!pendingForwardsResult.Success)
+                {
+                    reporter.Error(pendingForwardsResult.ErrorMessage);
+                    return;
+                }
+                else
+                {
+                    reporter.Info($"Loaded TB10 pending forwards from: {pendingForwardsResult.TB10PdfPath}");
+                    reporter.Info($"Loaded TB20 pending forwards from: {pendingForwardsResult.TB20PdfPath}");
+                }
+
+
+                // 4. Compare and export to Excel (similar to hedges, but different columns and variance thresholds)
+
+                //Util.DumpDataTable(pendingForwardsResult.DTDataTB10, reporter);
+                //Util.DumpDataTable(pendingForwardsResult.DTDataTB20, reporter);
+                //Util.DumpDataTable(portiaResultTB10.Data, reporter);
+                //Util.DumpDataTable(portiaResultTB20.Data, reporter);
+
+                // 4. Compare Portia data against PDF data
+                ComparisonResult comparisonResult = PendingForwardsComparison.Compare(
+                    portiaResultTB10.Data,
+                    portiaResultTB20.Data,
+                    pendingForwardsResult.DTDataTB10,
+                    pendingForwardsResult.DTDataTB20);
+
+                if (!comparisonResult.Success)
+                {
+                    reporter.Error(comparisonResult.ErrorMessage);
+                    return;
+                }
+
+                reporter.Info(string.Format("TB10: {0} matched, {1} unmatched",
+                    comparisonResult.TB10Rows.FindAll(r => r.IsMatched).Count,
+                    comparisonResult.TB10Rows.FindAll(r => !r.IsMatched).Count));
+
+                reporter.Info(string.Format("TB20: {0} matched, {1} unmatched",
+                    comparisonResult.TB20Rows.FindAll(r => r.IsMatched).Count,
+                    comparisonResult.TB20Rows.FindAll(r => !r.IsMatched).Count));
+
+                // 5. Export to Excel
+                string outputFolder = Util.getAppConfigVal("PendingForwardsOutputFolder");
+
+                ExportResult exportResult = PendingForwardsExporter.Export(
+                    comparisonResult, tradeDate, outputFolder);
+
+                if (!exportResult.Success)
+                {
+                    reporter.Error(exportResult.ErrorMessage);
+                    return;
+                }
+
+                var fileUri = new Uri(exportResult.FilePath).AbsoluteUri;
+
+                // Show clickable link in RichTextBox
+                // reporter.Link(exportResult.FilePath);
+                reporter.Info($"Link to open the file:\n");
+                reporter.Info(fileUri + Environment.NewLine);
+                reporter.Info("\n");
+
+            }
+            catch (Exception ex)
+            {
+                HandleError(ex, closeForm: false);
+                ShowError(rtbScreen, ex.Message);
+            }
+        }
+
+
     } // end of class
 }  // end of namespace

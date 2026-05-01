@@ -72,7 +72,7 @@ namespace PortiaMoxyImport.Forms
             this.Name = "FormSelectDate";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Select Date";
-            this.Load += new System.EventHandler(this.FormSelectDate_Load);
+            this.Shown += new System.EventHandler(this.FormSelectDate_Shown);
             this.ResumeLayout(false);
 
         }

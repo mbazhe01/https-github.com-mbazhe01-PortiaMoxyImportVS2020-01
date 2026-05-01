@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PortiaMoxyImport.Redesign
 {
-    internal interface IConversionReporter
+    public interface IConversionReporter
     {
         void Info(string message);
         void Success(string message);
