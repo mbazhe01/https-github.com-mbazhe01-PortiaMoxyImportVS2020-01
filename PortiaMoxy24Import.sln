@@ -55,8 +55,8 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {13F282A2-02CE-4E29-85BF-72FD67EB50FC}
 		VisualSVNWorkingCopyRoot = .
+		SolutionGuid = {13F282A2-02CE-4E29-85BF-72FD67EB50FC}
 	EndGlobalSection
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = PortiaMoxyImport.vsmdi

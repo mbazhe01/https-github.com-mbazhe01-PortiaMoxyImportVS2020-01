@@ -39,7 +39,7 @@ namespace PortiaMoxyImport.Services
                 if (files.Count == 0)
                 {
                     throw new FileNotFoundException(
-                        "No files found matching pattern '" + _config.FilePattern + "' in directory '" +
+                        "SFTP Server: No files found matching pattern '" + _config.FilePattern + "' in directory '" +
                         _config.RemoteDirectory + "'.");
                 }
 

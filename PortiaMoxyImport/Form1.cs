@@ -3183,6 +3183,7 @@ namespace PortiaMoxyImport
 
                 // User selected a date
                 DateTime portiaTradeDate = dlg.getSelectedDate();
+                reporter.Info($"Selected Portia date: {portiaTradeDate}\n");
                 DateTime tradeDate = NextBusinessDay(portiaTradeDate);
                 string dateSuffix = tradeDate.ToString("yyyyMMdd");
                 string portiaDateSuffix = portiaTradeDate.ToString("MMddyyyy");
@@ -3195,7 +3196,10 @@ namespace PortiaMoxyImport
                 decimal varianceThreshold = decimal.Parse(
                             Util.getAppConfigVal("HedgeExposureVariance"),
                             CultureInfo.InvariantCulture);
-
+                                                
+                decimal pctVarianceThreshhold = decimal.Parse(
+                            Util.getAppConfigVal("PctHedgeExposureVariance"),
+                            CultureInfo.InvariantCulture);
 
                 var config = new SftpConfig
                 {
@@ -3261,7 +3265,7 @@ namespace PortiaMoxyImport
 
                 var stopwatch = Stopwatch.StartNew();
 
-                ExportToExcelInterop_ObjectArray(uniquePortCurPairs, outputFilePath, trades, portiaHedges, varianceThreshold);
+                ExportToExcelInterop_ObjectArray(uniquePortCurPairs, outputFilePath, trades, portiaHedges, varianceThreshold, pctVarianceThreshhold);
 
                 stopwatch.Stop();
 
@@ -3544,177 +3548,388 @@ namespace PortiaMoxyImport
             }
         }
 
-  
-public void ExportToExcelInterop_ObjectArray(
-    List<PortCur> sortedList,
-    string filePath,
-    List<HedgeExposureDto> trades,
-    List<PortiaHdgExposureDto> portiaHedges,
-    decimal hedgeExposureVariance)
-    {
-        Excel.Application excelApp = null;
-        Excel.Workbooks workbooks = null;
-        Excel.Workbook workbook = null;
-        Excel.Worksheet worksheet = null;
-
-        try
+        public void ExportToExcelInterop_ObjectArray(
+          List<PortCur> sortedList,
+          string filePath,
+          List<HedgeExposureDto> trades,
+          List<PortiaHdgExposureDto> portiaHedges,
+          decimal hedgeExposureVariance,
+          decimal pctHedgeExposureVariance)
         {
-            excelApp = new Excel.Application();
-            if (excelApp == null) throw new Exception("Excel is not installed.");
+            Excel.Application excelApp = null;
+            Excel.Workbooks workbooks = null;
+            Excel.Workbook workbook = null;
+            Excel.Worksheet worksheet = null;
 
-            workbooks = excelApp.Workbooks;
-            workbook = workbooks.Add(Type.Missing);
-            worksheet = (Excel.Worksheet)workbook.ActiveSheet;
-
-            // 1) Headers (single write)
-            string[] headers =
+            try
             {
-            "Port", "Currency",
-            "Hedge Exposure (NT)", "Hedge Exposure (Portia)", "Diff", "Pct Diff",
-            "Total Base MTM (NT)", "Market Val FWRDS (Portia)", "Diff", "Pct Diff",
-            "Base Amt To be adjusted (NT)", "Hedge AMount (Portia)", "Diff", "Pct Diff",
-            "NT Date", "Portia Date"
+                excelApp = new Excel.Application();
+                if (excelApp == null) throw new Exception("Excel is not installed.");
+
+                workbooks = excelApp.Workbooks;
+                workbook = workbooks.Add(Type.Missing);
+                worksheet = (Excel.Worksheet)workbook.ActiveSheet;
+
+                // 1) Headers (single write)
+                string[] headers =
+                {
+            "Port",                          // col 1  A
+            "Currency",                      // col 2  B
+            "Hedge Exposure (NT)",           // col 3  C
+            "Pct Hedge Exposure (NT)",       // col 4  D  ← new (empty)
+            "Hedge Exposure (Portia)",       // col 5  E
+            "Pct Hedge Exposure (Portia)",   // col 6  F  ← new (empty)
+            "Diff",                          // col 7  G
+            "Pct Diff",                      // col 8  H
+            "Total Base MTM (NT)",           // col 9  I
+            "Market Val FWRDS (Portia)",     // col 10 J
+            "Diff",                          // col 11 K
+            "Pct Diff",                      // col 12 L
+            "Base Amt To be adjusted (NT)",  // col 13 M
+            "Hedge AMount (Portia)",         // col 14 N
+            "Diff",                          // col 15 O
+            "Pct Diff",                      // col 16 P
+            "NT Date",                       // col 17 Q
+            "Portia Date"                    // col 18 R
         };
 
-            var headerArr = Array.CreateInstance(typeof(object), new[] { 1, headers.Length }, new[] { 1, 1 });
-            for (int c = 1; c <= headers.Length; c++)
-                headerArr.SetValue(headers[c - 1], 1, c);
+                var headerArr = Array.CreateInstance(typeof(object), new[] { 1, headers.Length }, new[] { 1, 1 });
+                for (int c = 1; c <= headers.Length; c++)
+                    headerArr.SetValue(headers[c - 1], 1, c);
 
-            Excel.Range headerRange = worksheet.Range["A1", "P1"];
-            headerRange.Value2 = headerArr;
-            headerRange.Font.Bold = true;
+                Excel.Range headerRange = worksheet.Range["A1", "R1"]; // was "P1", now "R1"
+                headerRange.Value2 = headerArr;
+                headerRange.Font.Bold = true;
 
-            // 2) Pre-group once (fast lookups; small data but clean & scalable)
-            var tradesByKey = trades
-                .GroupBy(t => new Key(t.AccountId, t.LocalCurrencyCode))
-                .ToDictionary(g => g.Key, g => new TradeAgg(
-                    totalBaseHedgeExposure: g.Sum(x => x.TotalBaseHedgeExposure),
-                    totalBaseMtm: g.Sum(x => x.TotalBaseMtm),
-                    baseAmtToAdjust: g.Sum(x => x.BaseAmountToBeAdjusted),
-                    maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate)
-                ));
+                // 2) Pre-group once (fast lookups)
+                var tradesByKey = trades
+                    .GroupBy(t => new Key(t.AccountId, t.LocalCurrencyCode))
+                    .ToDictionary(g => g.Key, g => new TradeAgg(
+                        totalBaseHedgeExposure: g.Sum(x => x.TotalBaseHedgeExposure),
+                        totalBaseMtm: g.Sum(x => x.TotalBaseMtm),
+                        baseAmtToAdjust: g.Sum(x => x.BaseAmountToBeAdjusted),
+                        maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate)
+                    ));
 
-            var portiaByKey = portiaHedges
-                .GroupBy(p => new Key(p.Account, p.Security))
-                .ToDictionary(g => g.Key, g => new PortiaAgg(
-                    marketValueStocks: g.Sum(x => x.MarketValueStocks),
-                    marketValueForwards: g.Sum(x => x.MarketValueForwards),
-                    hedgeAmount: g.Sum(x => x.HedgeAmount),
-                    maxAsOfDate: g.Max(x => (DateTime?)x.AsOfDate)
-                ));
+                var portiaByKey = portiaHedges
+                    .GroupBy(p => new Key(p.Account, p.Security))
+                    .ToDictionary(g => g.Key, g => new PortiaAgg(
+                        marketValueStocks: g.Sum(x => x.MarketValueStocks),
+                        marketValueForwards: g.Sum(x => x.MarketValueForwards),
+                        hedgeAmount: g.Sum(x => x.HedgeAmount),
+                        maxAsOfDate: g.Max(x => (DateTime?)x.AsOfDate)
+                    ));
 
-            // 3) Build data array in memory (single Excel write)
-            int rowCount = sortedList.Count;
-            const int colCount = 16;
+                // 3) Build data array in memory (single Excel write)
+                int rowCount = sortedList.Count;
+                const int colCount = 18; // was 16
 
-            // 1-based 2D array for Excel
-            var dataArr = Array.CreateInstance(typeof(object), new[] { rowCount, colCount }, new[] { 1, 1 });
+                var dataArr = Array.CreateInstance(typeof(object), new[] { rowCount, colCount }, new[] { 1, 1 });
 
-            for (int i = 0; i < rowCount; i++)
-            {
-                var item = sortedList[i];
-                var key = new Key(item.Port, item.Currency);
+                for (int i = 0; i < rowCount; i++)
+                {
+                    var item = sortedList[i];
+                    var key = new Key(item.Port, item.Currency);
 
-                tradesByKey.TryGetValue(key, out var tAgg);
-                portiaByKey.TryGetValue(key, out var pAgg);
+                    tradesByKey.TryGetValue(key, out var tAgg);
+                    portiaByKey.TryGetValue(key, out var pAgg);
 
-                decimal totalBaseHedgeExposure = tAgg?.TotalBaseHedgeExposure ?? 0m;
-                decimal mktValueStocks = pAgg?.MarketValueStocks ?? 0m;
-                var v1 = CalcVariance(totalBaseHedgeExposure, mktValueStocks);
+                    decimal totalBaseHedgeExposure = tAgg?.TotalBaseHedgeExposure ?? 0m;
+                    decimal mktValueStocks = pAgg?.MarketValueStocks ?? 0m;
+                    var v1 = CalcVariance(totalBaseHedgeExposure, mktValueStocks);
 
-                decimal totalBaseMtm = tAgg?.TotalBaseMtm ?? 0m;
-                decimal mktValueFwrds = pAgg?.MarketValueForwards ?? 0m;
-                var v2 = CalcVariance(totalBaseMtm, mktValueFwrds);
+                    decimal totalBaseMtm = tAgg?.TotalBaseMtm ?? 0m;
+                    decimal mktValueFwrds = pAgg?.MarketValueForwards ?? 0m;
+                    var v2 = CalcVariance(totalBaseMtm, mktValueFwrds);
 
-                decimal baseAmt = tAgg?.BaseAmtToAdjust ?? 0m;
-                decimal hedgeAmt = pAgg?.HedgeAmount ?? 0m;
-                var v3 = CalcVariance(baseAmt, hedgeAmt);
+                    decimal baseAmt = tAgg?.BaseAmtToAdjust ?? 0m;
+                    decimal hedgeAmt = pAgg?.HedgeAmount ?? 0m;
+                    var v3 = CalcVariance(baseAmt, hedgeAmt);
 
-                DateTime? ntDate = tAgg?.MaxLedgerDate;
-                DateTime? portiaDate = pAgg?.MaxAsOfDate;
+                    decimal? pctHedgeExposureNT = null;
+                    if (totalBaseHedgeExposure != 0)
+                        pctHedgeExposureNT = baseAmt / totalBaseHedgeExposure;
 
-                int r = i + 1;
+                    decimal ? pctHedgeExposurePortia = null;
+                    if (mktValueStocks != 0)
+                        pctHedgeExposurePortia = hedgeAmt / mktValueStocks;
 
-                // A..P
-                dataArr.SetValue(item.Port, r, 1);
-                dataArr.SetValue(item.Currency, r, 2);
+                    DateTime? ntDate = tAgg?.MaxLedgerDate;
+                    DateTime? portiaDate = pAgg?.MaxAsOfDate;
 
-                dataArr.SetValue(totalBaseHedgeExposure, r, 3);
-                dataArr.SetValue(mktValueStocks, r, 4);
-                dataArr.SetValue(v1.Difference, r, 5);
-                dataArr.SetValue(v1.Variance, r, 6); // fraction (0.12 => 12%)
+                    int r = i + 1;
 
-                dataArr.SetValue(totalBaseMtm, r, 7);
-                dataArr.SetValue(mktValueFwrds, r, 8);
-                dataArr.SetValue(v2.Difference, r, 9);
-                dataArr.SetValue(v2.Variance, r, 10);
+                    dataArr.SetValue(item.Port, r, 1);   // A - Port
+                    dataArr.SetValue(item.Currency, r, 2);   // B - Currency
+                    dataArr.SetValue(totalBaseHedgeExposure, r, 3);   // C - Hedge Exposure (NT)
+                    dataArr.SetValue(pctHedgeExposureNT, r, 4);   // D - Pct Hedge Exposure (NT)      ← new 
+                    dataArr.SetValue(mktValueStocks, r, 5);   // E - Hedge Exposure (Portia)
+                    dataArr.SetValue(pctHedgeExposurePortia, r, 6);   // F - Pct Hedge Exposure (Portia)  ← new empty
+                    dataArr.SetValue(v1.Difference, r, 7);   // G - Diff
+                    dataArr.SetValue(v1.Variance, r, 8);   // H - Pct Diff
+                    dataArr.SetValue(totalBaseMtm, r, 9);   // I - Total Base MTM (NT)
+                    dataArr.SetValue(mktValueFwrds, r, 10);  // J - Market Val FWRDS (Portia)
+                    dataArr.SetValue(v2.Difference, r, 11);  // K - Diff
+                    dataArr.SetValue(v2.Variance, r, 12);  // L - Pct Diff
+                    dataArr.SetValue(baseAmt, r, 13);  // M - Base Amt To be adjusted (NT)
+                    dataArr.SetValue(hedgeAmt, r, 14);  // N - Hedge AMount (Portia)
+                    dataArr.SetValue(v3.Difference, r, 15);  // O - Diff
+                    dataArr.SetValue(v3.Variance, r, 16);  // P - Pct Diff
+                    dataArr.SetValue(ntDate, r, 17);  // Q - NT Date
+                    dataArr.SetValue(portiaDate, r, 18);  // R - Portia Date
+                }
 
-                dataArr.SetValue(baseAmt, r, 11);
-                dataArr.SetValue(hedgeAmt, r, 12);
-                dataArr.SetValue(v3.Difference, r, 13);
-                dataArr.SetValue(v3.Variance, r, 14);
+                int firstDataRow = 2;
+                int lastDataRow = firstDataRow + rowCount - 1;
 
-                dataArr.SetValue(ntDate, r, 15);
-                dataArr.SetValue(portiaDate, r, 16);
+                Excel.Range dataRange = worksheet.Range[
+                    worksheet.Cells[firstDataRow, 1],
+                    worksheet.Cells[lastDataRow, colCount]
+                ];
+                dataRange.Value2 = dataArr;
+
+                // 4) Formatting — percent columns shifted by +2
+                // Pct Diff cols: H(8), L(12), P(16)
+                Excel.Range varianceRange1 = worksheet.Range[worksheet.Cells[firstDataRow, 8], worksheet.Cells[lastDataRow, 8]];
+                Excel.Range varianceRange2 = worksheet.Range[worksheet.Cells[firstDataRow, 12], worksheet.Cells[lastDataRow, 12]];
+                Excel.Range varianceRange3 = worksheet.Range[worksheet.Cells[firstDataRow, 16], worksheet.Cells[lastDataRow, 16]];
+                Excel.Range pctHedgeRange  = worksheet.Range[worksheet.Cells[firstDataRow, 4], worksheet.Cells[lastDataRow, 4]];
+                Excel.Range pctHedgeRangePortia = worksheet.Range[worksheet.Cells[firstDataRow, 6], worksheet.Cells[lastDataRow, 6]];
+
+
+                varianceRange1.NumberFormat = "0.00%";
+                varianceRange2.NumberFormat = "0.00%";
+                varianceRange3.NumberFormat = "0.00%";
+                pctHedgeRange.NumberFormat = "0.00%";
+                pctHedgeRangePortia.NumberFormat = "0.00%";
+
+                // Date columns: Q(17), R(18)
+                Excel.Range dateRange = worksheet.Range[worksheet.Cells[firstDataRow, 17], worksheet.Cells[lastDataRow, 18]];
+                dateRange.NumberFormat = "mm/dd/yyyy";
+
+                // 5) Conditional formatting on Pct Diff columns: H, L, P
+                ApplyVarianceConditionalFormatting(varianceRange1, hedgeExposureVariance);
+                ApplyVarianceConditionalFormatting(varianceRange2, hedgeExposureVariance);
+                ApplyVarianceConditionalFormatting(varianceRange3, hedgeExposureVariance);
+                ApplyAbslouteVarianceConditionalFormatting(pctHedgeRange, pctHedgeExposureVariance);
+                ApplyAbslouteVarianceConditionalFormatting(pctHedgeRangePortia, pctHedgeExposureVariance);
+
+                // 6) Shade rows by portfolio group
+                ShadeRowsByPortfolio(worksheet, sortedList, firstDataRow, colCount);
+
+                worksheet.Columns.AutoFit();
+
+                worksheet.Range["A2"].Select();
+                excelApp.ActiveWindow.FreezePanes = true;
+
+                workbook.SaveAs(filePath);
+                workbook.Close();
             }
+            finally
+            {
+                if (excelApp != null) excelApp.Quit();
 
-            int firstDataRow = 2;
-            int lastDataRow = firstDataRow + rowCount - 1;
-
-            Excel.Range dataRange = worksheet.Range[
-                worksheet.Cells[firstDataRow, 1],
-                worksheet.Cells[lastDataRow, colCount]
-            ];
-
-            dataRange.Value2 = dataArr; // ✅ single write
-
-            // 4) Formatting (done in big blocks)
-            // Percent columns: F, J, N
-            Excel.Range varianceRange1 = worksheet.Range[worksheet.Cells[firstDataRow, 6], worksheet.Cells[lastDataRow, 6]];
-            Excel.Range varianceRange2 = worksheet.Range[worksheet.Cells[firstDataRow, 10], worksheet.Cells[lastDataRow, 10]];
-            Excel.Range varianceRange3 = worksheet.Range[worksheet.Cells[firstDataRow, 14], worksheet.Cells[lastDataRow, 14]];
-
-            varianceRange1.NumberFormat = "0.00%";
-            varianceRange2.NumberFormat = "0.00%";
-            varianceRange3.NumberFormat = "0.00%";
-
-            // Date columns: O, P (optional)
-            Excel.Range dateRange = worksheet.Range[worksheet.Cells[firstDataRow, 15], worksheet.Cells[lastDataRow, 16]];
-            dateRange.NumberFormat = "mm/dd/yyyy";
-
-            // 5) Conditional formatting: variance > 5% => red background + white font
-            ApplyVarianceConditionalFormatting(varianceRange1, hedgeExposureVariance);
-            ApplyVarianceConditionalFormatting(varianceRange2, hedgeExposureVariance);
-            ApplyVarianceConditionalFormatting(varianceRange3, hedgeExposureVariance);
-
-            // 6) Shade rows by portfolio group (still a loop, but cheap and readable)
-            ShadeRowsByPortfolio(worksheet, sortedList, firstDataRow, colCount);
-
-            worksheet.Columns.AutoFit();
-
-            worksheet.Range["A2"].Select();
-            excelApp.ActiveWindow.FreezePanes = true;
-
-            workbook.SaveAs(filePath);
-            workbook.Close();
+                SafeReleaseComObject(worksheet);
+                SafeReleaseComObject(workbook);
+                SafeReleaseComObject(workbooks);
+                SafeReleaseComObject(excelApp);
+            }
         }
-        finally
+
+        //public void ExportToExcelInterop_ObjectArray(
+        //    List<PortCur> sortedList,
+        //    string filePath,
+        //    List<HedgeExposureDto> trades,
+        //    List<PortiaHdgExposureDto> portiaHedges,
+        //    decimal hedgeExposureVariance)
+        //    {
+        //        Excel.Application excelApp = null;
+        //        Excel.Workbooks workbooks = null;
+        //        Excel.Workbook workbook = null;
+        //        Excel.Worksheet worksheet = null;
+
+        //        try
+        //        {
+        //            excelApp = new Excel.Application();
+        //            if (excelApp == null) throw new Exception("Excel is not installed.");
+
+        //            workbooks = excelApp.Workbooks;
+        //            workbook = workbooks.Add(Type.Missing);
+        //            worksheet = (Excel.Worksheet)workbook.ActiveSheet;
+
+        //            // 1) Headers (single write)
+        //            string[] headers =
+        //            {
+        //            "Port", "Currency",
+        //            "Hedge Exposure (NT)", "Hedge Exposure (Portia)", "Diff", "Pct Diff",
+        //            "Total Base MTM (NT)", "Market Val FWRDS (Portia)", "Diff", "Pct Diff",
+        //            "Base Amt To be adjusted (NT)", "Hedge AMount (Portia)", "Diff", "Pct Diff",
+        //            "NT Date", "Portia Date"
+        //        };
+
+        //            var headerArr = Array.CreateInstance(typeof(object), new[] { 1, headers.Length }, new[] { 1, 1 });
+        //            for (int c = 1; c <= headers.Length; c++)
+        //                headerArr.SetValue(headers[c - 1], 1, c);
+
+        //            Excel.Range headerRange = worksheet.Range["A1", "P1"];
+        //            headerRange.Value2 = headerArr;
+        //            headerRange.Font.Bold = true;
+
+        //            // 2) Pre-group once (fast lookups; small data but clean & scalable)
+        //            var tradesByKey = trades
+        //                .GroupBy(t => new Key(t.AccountId, t.LocalCurrencyCode))
+        //                .ToDictionary(g => g.Key, g => new TradeAgg(
+        //                    totalBaseHedgeExposure: g.Sum(x => x.TotalBaseHedgeExposure),
+        //                    totalBaseMtm: g.Sum(x => x.TotalBaseMtm),
+        //                    baseAmtToAdjust: g.Sum(x => x.BaseAmountToBeAdjusted),
+        //                    maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate)
+        //                ));
+
+        //            var portiaByKey = portiaHedges
+        //                .GroupBy(p => new Key(p.Account, p.Security))
+        //                .ToDictionary(g => g.Key, g => new PortiaAgg(
+        //                    marketValueStocks: g.Sum(x => x.MarketValueStocks),
+        //                    marketValueForwards: g.Sum(x => x.MarketValueForwards),
+        //                    hedgeAmount: g.Sum(x => x.HedgeAmount),
+        //                    maxAsOfDate: g.Max(x => (DateTime?)x.AsOfDate)
+        //                ));
+
+        //            // 3) Build data array in memory (single Excel write)
+        //            int rowCount = sortedList.Count;
+        //            const int colCount = 16;
+
+        //            // 1-based 2D array for Excel
+        //            var dataArr = Array.CreateInstance(typeof(object), new[] { rowCount, colCount }, new[] { 1, 1 });
+
+        //            for (int i = 0; i < rowCount; i++)
+        //            {
+        //                var item = sortedList[i];
+        //                var key = new Key(item.Port, item.Currency);
+
+        //                tradesByKey.TryGetValue(key, out var tAgg);
+        //                portiaByKey.TryGetValue(key, out var pAgg);
+
+        //                decimal totalBaseHedgeExposure = tAgg?.TotalBaseHedgeExposure ?? 0m;
+        //                decimal mktValueStocks = pAgg?.MarketValueStocks ?? 0m;
+        //                var v1 = CalcVariance(totalBaseHedgeExposure, mktValueStocks);
+
+        //                decimal totalBaseMtm = tAgg?.TotalBaseMtm ?? 0m;
+        //                decimal mktValueFwrds = pAgg?.MarketValueForwards ?? 0m;
+        //                var v2 = CalcVariance(totalBaseMtm, mktValueFwrds);
+
+        //                decimal baseAmt = tAgg?.BaseAmtToAdjust ?? 0m;
+        //                decimal hedgeAmt = pAgg?.HedgeAmount ?? 0m;
+        //                var v3 = CalcVariance(baseAmt, hedgeAmt);
+
+        //                DateTime? ntDate = tAgg?.MaxLedgerDate;
+        //                DateTime? portiaDate = pAgg?.MaxAsOfDate;
+
+        //                int r = i + 1;
+
+        //                // A..P
+        //                dataArr.SetValue(item.Port, r, 1);
+        //                dataArr.SetValue(item.Currency, r, 2);
+
+        //                dataArr.SetValue(totalBaseHedgeExposure, r, 3);
+        //                dataArr.SetValue(mktValueStocks, r, 4);
+        //                dataArr.SetValue(v1.Difference, r, 5);
+        //                dataArr.SetValue(v1.Variance, r, 6); // fraction (0.12 => 12%)
+
+        //                dataArr.SetValue(totalBaseMtm, r, 7);
+        //                dataArr.SetValue(mktValueFwrds, r, 8);
+        //                dataArr.SetValue(v2.Difference, r, 9);
+        //                dataArr.SetValue(v2.Variance, r, 10);
+
+        //                dataArr.SetValue(baseAmt, r, 11);
+        //                dataArr.SetValue(hedgeAmt, r, 12);
+        //                dataArr.SetValue(v3.Difference, r, 13);
+        //                dataArr.SetValue(v3.Variance, r, 14);
+
+        //                dataArr.SetValue(ntDate, r, 15);
+        //                dataArr.SetValue(portiaDate, r, 16);
+        //            }
+
+        //            int firstDataRow = 2;
+        //            int lastDataRow = firstDataRow + rowCount - 1;
+
+        //            Excel.Range dataRange = worksheet.Range[
+        //                worksheet.Cells[firstDataRow, 1],
+        //                worksheet.Cells[lastDataRow, colCount]
+        //            ];
+
+        //            dataRange.Value2 = dataArr; // ✅ single write
+
+        //            // 4) Formatting (done in big blocks)
+        //            // Percent columns: F, J, N
+        //            Excel.Range varianceRange1 = worksheet.Range[worksheet.Cells[firstDataRow, 6], worksheet.Cells[lastDataRow, 6]];
+        //            Excel.Range varianceRange2 = worksheet.Range[worksheet.Cells[firstDataRow, 10], worksheet.Cells[lastDataRow, 10]];
+        //            Excel.Range varianceRange3 = worksheet.Range[worksheet.Cells[firstDataRow, 14], worksheet.Cells[lastDataRow, 14]];
+
+        //            varianceRange1.NumberFormat = "0.00%";
+        //            varianceRange2.NumberFormat = "0.00%";
+        //            varianceRange3.NumberFormat = "0.00%";
+
+        //            // Date columns: O, P (optional)
+        //            Excel.Range dateRange = worksheet.Range[worksheet.Cells[firstDataRow, 15], worksheet.Cells[lastDataRow, 16]];
+        //            dateRange.NumberFormat = "mm/dd/yyyy";
+
+        //            // 5) Conditional formatting: variance > 5% => red background + white font
+        //            ApplyVarianceConditionalFormatting(varianceRange1, hedgeExposureVariance);
+        //            ApplyVarianceConditionalFormatting(varianceRange2, hedgeExposureVariance);
+        //            ApplyVarianceConditionalFormatting(varianceRange3, hedgeExposureVariance);
+
+        //            // 6) Shade rows by portfolio group (still a loop, but cheap and readable)
+        //            ShadeRowsByPortfolio(worksheet, sortedList, firstDataRow, colCount);
+
+        //            worksheet.Columns.AutoFit();
+
+        //            worksheet.Range["A2"].Select();
+        //            excelApp.ActiveWindow.FreezePanes = true;
+
+        //            workbook.SaveAs(filePath);
+        //            workbook.Close();
+        //        }
+        //        finally
+        //        {
+        //            if (excelApp != null) excelApp.Quit();
+
+        //            SafeReleaseComObject(worksheet);
+        //            SafeReleaseComObject(workbook);
+        //            SafeReleaseComObject(workbooks);
+        //            SafeReleaseComObject(excelApp);
+        //        }
+        //    }
+
+        private static void ApplyAbslouteVarianceConditionalFormatting(Excel.Range range, decimal threshold)
         {
-            if (excelApp != null) excelApp.Quit();
+            // Clear existing conditional formatting
+            range.FormatConditions.Delete();
 
-            SafeReleaseComObject(worksheet);
-            SafeReleaseComObject(workbook);
-            SafeReleaseComObject(workbooks);
-            SafeReleaseComObject(excelApp);
+            // Use absolute value comparison
+            string formula = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "=ABS({0})>{1}",
+                range.Cells[1, 1].Address[false, false],
+                Math.Abs(threshold)
+            );
+
+            Excel.FormatCondition fc = (Excel.FormatCondition)range.FormatConditions.Add(
+                Type: Excel.XlFormatConditionType.xlExpression,
+                Formula1: formula
+            );
+
+            fc.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Red);
+            fc.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+
+            SafeReleaseComObject(fc);
         }
-    }
 
-    private static void ApplyVarianceConditionalFormatting(Excel.Range range, decimal threshold)
+        private static void ApplyVarianceConditionalFormatting(Excel.Range range, decimal threshold)
     {
         // Clear existing CF on that range (optional; remove if you want to keep)
         range.FormatConditions.Delete();
 
-        // Add a cell-value rule: Cell Value > 0.05
+        // Add a cell-value rule: Cell Value > threshold
         Excel.FormatCondition fc = (Excel.FormatCondition)range.FormatConditions.Add(
             Type: Excel.XlFormatConditionType.xlCellValue,
             Operator: Excel.XlFormatConditionOperator.xlGreater,
