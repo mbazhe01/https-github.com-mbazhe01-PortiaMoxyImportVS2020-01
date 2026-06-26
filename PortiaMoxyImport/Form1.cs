@@ -3581,7 +3581,7 @@ namespace PortiaMoxyImport
             "Pct Hedge Exposure (Portia)",   // col 6  F  ← new (empty)
             "Diff",                          // col 7  G
             "Pct Diff",                      // col 8  H
-            "Total Base MTM (NT)",           // col 9  I
+            "Total Base Hedge Trades (NT)",  // col 9  I
             "Market Val FWRDS (Portia)",     // col 10 J
             "Diff",                          // col 11 K
             "Pct Diff",                      // col 12 L
@@ -3608,7 +3608,8 @@ namespace PortiaMoxyImport
                         totalBaseHedgeExposure: g.Sum(x => x.TotalBaseHedgeExposure),
                         totalBaseMtm: g.Sum(x => x.TotalBaseMtm),
                         baseAmtToAdjust: g.Sum(x => x.BaseAmountToBeAdjusted),
-                        maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate)
+                        maxLedgerDate: g.Max(x => (DateTime?)x.LedgerDate),
+                        totalBaseHedgeTrades: g.Sum(x => x.TotalBaseHedgeTrades)
                     ));
 
                 var portiaByKey = portiaHedges
@@ -3618,6 +3619,7 @@ namespace PortiaMoxyImport
                         marketValueForwards: g.Sum(x => x.MarketValueForwards),
                         hedgeAmount: g.Sum(x => x.HedgeAmount),
                         maxAsOfDate: g.Max(x => (DateTime?)x.AsOfDate)
+                     
                     ));
 
                 // 3) Build data array in memory (single Excel write)
@@ -3635,6 +3637,8 @@ namespace PortiaMoxyImport
                     portiaByKey.TryGetValue(key, out var pAgg);
 
                     decimal totalBaseHedgeExposure = tAgg?.TotalBaseHedgeExposure ?? 0m;
+                    decimal totalBaseHedgeTrades = tAgg?.TotalBaseHedgeTrades ?? 0m;
+
                     decimal mktValueStocks = pAgg?.MarketValueStocks ?? 0m;
                     var v1 = CalcVariance(totalBaseHedgeExposure, mktValueStocks);
 
@@ -3667,7 +3671,8 @@ namespace PortiaMoxyImport
                     dataArr.SetValue(pctHedgeExposurePortia, r, 6);   // F - Pct Hedge Exposure (Portia)  ← new empty
                     dataArr.SetValue(v1.Difference, r, 7);   // G - Diff
                     dataArr.SetValue(v1.Variance, r, 8);   // H - Pct Diff
-                    dataArr.SetValue(totalBaseMtm, r, 9);   // I - Total Base MTM (NT)
+                    dataArr.SetValue(totalBaseHedgeTrades, r, 9);   // I - Total Base Hedge Trades (NT)
+                    //dataArr.SetValue(totalBaseMtm, r, 9);   // I - Total Base MTM (NT)
                     dataArr.SetValue(mktValueFwrds, r, 10);  // J - Market Val FWRDS (Portia)
                     dataArr.SetValue(v2.Difference, r, 11);  // K - Diff
                     dataArr.SetValue(v2.Variance, r, 12);  // L - Pct Diff
@@ -3995,18 +4000,22 @@ namespace PortiaMoxyImport
 
     private sealed class TradeAgg
     {
-        public TradeAgg(decimal totalBaseHedgeExposure, decimal totalBaseMtm, decimal baseAmtToAdjust, DateTime? maxLedgerDate)
-        {
-            TotalBaseHedgeExposure = totalBaseHedgeExposure;
-            TotalBaseMtm = totalBaseMtm;
-            BaseAmtToAdjust = baseAmtToAdjust;
-            MaxLedgerDate = maxLedgerDate;
-        }
+        public TradeAgg(decimal totalBaseHedgeExposure, decimal totalBaseMtm, decimal baseAmtToAdjust, DateTime? maxLedgerDate, decimal totalBaseHedgeTrades)
+            {
+                TotalBaseHedgeExposure = totalBaseHedgeExposure;
+                TotalBaseMtm = totalBaseMtm;
+                BaseAmtToAdjust = baseAmtToAdjust;
+                MaxLedgerDate = maxLedgerDate;
+                TotalBaseHedgeTrades = totalBaseHedgeTrades;
+            }
 
-        public decimal TotalBaseHedgeExposure { get; }
+            public decimal TotalBaseHedgeExposure { get; }
         public decimal TotalBaseMtm { get; }
         public decimal BaseAmtToAdjust { get; }
         public DateTime? MaxLedgerDate { get; }
+
+        public decimal TotalBaseHedgeTrades { get; }
+
     }
 
     private sealed class PortiaAgg
